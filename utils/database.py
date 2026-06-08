@@ -17,6 +17,7 @@ def get_conn():
     return psycopg2.connect(url)
 
 
+@st.cache_resource
 def init_db():
     conn = get_conn()
     c = conn.cursor()
@@ -99,19 +100,16 @@ def init_db():
     """)
 
     conn.commit()
+    _seed_issue_codes(c, conn)
+    _seed_holidays_2026(c, conn)
     conn.close()
-    _seed_issue_codes()
-    _seed_holidays_2026()
 
 
-def _seed_issue_codes():
+def _seed_issue_codes(c, conn):
     """이슈 코드 기초 데이터 삽입"""
-    conn = get_conn()
-    c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM issue_code")
     count = c.fetchone()[0]
     if count > 0:
-        conn.close()
         return
 
     parts = [
@@ -172,17 +170,13 @@ def _seed_issue_codes():
         rows,
     )
     conn.commit()
-    conn.close()
 
 
-def _seed_holidays_2026():
+def _seed_holidays_2026(c, conn):
     """2026년 공휴일 삽입"""
-    conn = get_conn()
-    c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM holiday")
     count = c.fetchone()[0]
     if count > 0:
-        conn.close()
         return
 
     holidays = [
@@ -204,7 +198,6 @@ def _seed_holidays_2026():
     ]
     c.executemany("INSERT INTO holiday (holiday_date,holiday_name) VALUES (%s,%s) ON CONFLICT (holiday_date) DO NOTHING", holidays)
     conn.commit()
-    conn.close()
 
 
 # ─────────── 설비 CRUD ───────────
