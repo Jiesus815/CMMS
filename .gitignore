@@ -1,0 +1,22 @@
+# 시크릿 / 환경설정 (절대 Git에 올리지 말 것)
+.streamlit/secrets.toml
+
+# SQLite DB 파일
+db/
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 임시 파일
+*.tmp
+*.xlsx.tmp
