@@ -2,38 +2,25 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_weekly_pivot, get_maintenance, init_db
+from utils.constants import FACTORIES
+from utils.style import inject_css, page_header
 import pandas as pd
 from datetime import datetime
 
 init_db()
 
 st.set_page_config(page_title="주차별 현황 · CMMS", page_icon="📅", layout="wide")
+inject_css()
 
-st.markdown("""
-<style>
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
-</style>
-""", unsafe_allow_html=True)
+page_header("📅 주차별 보전 현황표", "설비별 주차(Week) 보전 건수 피벗 테이블")
 
-st.markdown("""
-<div class="page-header">
-    <h1>📅 주차별 보전 현황표</h1>
-    <p>설비별 주차(Week) 보전 건수 피벗 테이블</p>
-</div>
-""", unsafe_allow_html=True)
-
-FACTORIES = ["전체", "광명A", "광명B", "광명C", "광명D", "화성A", "화성B"]
+FACTORIES_WITH_ALL = ["전체"] + FACTORIES
 
 fc1, fc2 = st.columns([1, 1])
 with fc1:
     year_sel = st.selectbox("연도", [2026, 2025])
 with fc2:
-    fac_sel = st.selectbox("팩토리", FACTORIES)
+    fac_sel = st.selectbox("팩토리", FACTORIES_WITH_ALL)
 
 df_raw = get_weekly_pivot(
     year=year_sel,

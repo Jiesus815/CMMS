@@ -2,35 +2,17 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_equipment, upsert_equipment, delete_equipment, init_db
+from utils.constants import FACTORIES, EQUIPMENT_STATUS_LIST as STATUS_LIST, CATEGORY_LIST
+from utils.style import inject_css, page_header
 import pandas as pd
 from datetime import date
 
 init_db()
 
 st.set_page_config(page_title="설비 Overview · CMMS", page_icon="⚙️", layout="wide")
+inject_css()
 
-st.markdown("""
-<style>
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="page-header">
-    <h1>⚙️ 설비 Overview</h1>
-    <p>설비 상태 현황 · 등록 · 수정</p>
-</div>
-""", unsafe_allow_html=True)
-
-FACTORIES = ["광명A", "광명B", "광명C", "광명D", "화성A", "화성B", "화성C"]
-STATUS_LIST = ["정상", "점검중", "팬딩", "고장", "폐기"]
-CATEGORY_LIST = ["애벌기", "불림수조", "플라이트", "포장기", "라벨분리기", "라벨부착기",
-                 "자동애벌기", "자동투입기", "C-Line", "린서", "건조기", "컨베이어", "펌프", "판넬", "유틸리티", "기타"]
+page_header("⚙️ 설비 Overview", "설비 상태 현황 · 등록 · 수정")
 
 tab1, tab2 = st.tabs(["📋 설비 목록", "➕ 설비 등록"])
 

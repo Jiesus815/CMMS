@@ -2,6 +2,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, init_db
+from utils.style import inject_css, page_header
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -10,34 +11,16 @@ from datetime import datetime
 init_db()
 
 st.set_page_config(page_title="대시보드 · CMMS", page_icon="📊", layout="wide")
-
-st.markdown("""
-<style>
-[data-testid="metric-container"] {
-    background: white; border-radius: 12px; padding: 16px 20px;
-    border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
+inject_css("""
 .alert-box {
     background: #FFF7ED; border-left: 4px solid #F97316;
     padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 8px 0;
 }
-</style>
-""", unsafe_allow_html=True)
+""")
 
 # ─── 헤더 ───
 current_year = datetime.now().year
-st.markdown(f"""
-<div class="page-header">
-    <h1>📊 대시보드</h1>
-    <p>보전 현황 한눈에 보기 · {datetime.now().strftime('%Y년 %m월 %d일')}</p>
-</div>
-""", unsafe_allow_html=True)
+page_header("📊 대시보드", f"보전 현황 한눈에 보기 · {datetime.now().strftime('%Y년 %m월 %d일')}")
 
 # ─── 연도 필터 ───
 col_f1, col_f2 = st.columns([1, 5])

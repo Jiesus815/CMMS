@@ -2,34 +2,21 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import import_from_excel, init_db, get_conn, get_maintenance, get_equipment
+from utils.style import inject_css, page_header
 import tempfile
 from datetime import datetime
 
 init_db()
 
 st.set_page_config(page_title="데이터 관리 · CMMS", page_icon="📁", layout="wide")
-
-st.markdown("""
-<style>
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
+inject_css("""
 .info-card {
     background: white; border: 1px solid #E2E8F0;
     border-radius: 12px; padding: 20px; margin: 8px 0;
 }
-</style>
-""", unsafe_allow_html=True)
+""")
 
-st.markdown("""
-<div class="page-header">
-    <h1>📁 데이터 관리</h1>
-    <p>Excel Import · DB 백업 · 데이터 초기화</p>
-</div>
-""", unsafe_allow_html=True)
+page_header("📁 데이터 관리", "Excel Import · DB 백업 · 데이터 초기화")
 
 tab1, tab2, tab3 = st.tabs(["📥 Excel Import", "💾 DB 백업", "⚠️ 초기화"])
 

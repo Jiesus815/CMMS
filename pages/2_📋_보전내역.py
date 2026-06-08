@@ -5,40 +5,17 @@ from utils.database import (
     get_maintenance, insert_maintenance, update_maintenance, delete_maintenance,
     get_equipment, get_issue_code_options, get_issue_codes, init_db
 )
+from utils.constants import FACTORIES, MAINTENANCE_STATUS_LIST as STATUS_LIST, SHIFT_LIST, RECV_TYPE_LIST, CONTRACTOR_LIST
+from utils.style import inject_css, page_header
 import pandas as pd
 from datetime import datetime, date
 
 init_db()
 
 st.set_page_config(page_title="보전내역 · CMMS", page_icon="📋", layout="wide")
+inject_css()
 
-st.markdown("""
-<style>
-[data-testid="metric-container"] {
-    background: white; border-radius: 12px; padding: 16px 20px;
-    border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="page-header">
-    <h1>📋 보전내역 관리</h1>
-    <p>보전 작업 등록 · 조회 · 수정 · 삭제</p>
-</div>
-""", unsafe_allow_html=True)
-
-FACTORIES = ["광명A", "광명B", "광명C", "광명D", "화성A", "화성B", "화성C"]
-STATUS_LIST = ["진행 중", "완료", "팬딩", "고장", "취소"]
-SHIFT_LIST = ["주간", "야간", "상시"]
-RECV_TYPE_LIST = ["생산 설비", "유틸리티", "건물/시설", "기타"]
-CONTRACTOR_LIST = ["자체", "외주"]
+page_header("📋 보전내역 관리", "보전 작업 등록 · 조회 · 수정 · 삭제")
 
 # ─── 탭 ───
 tab1, tab2 = st.tabs(["📋 목록 조회", "➕ 신규 등록"])

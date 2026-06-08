@@ -2,29 +2,15 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_conn, init_db
+from utils.style import inject_css, page_header
 import pandas as pd
 
 init_db()
 
 st.set_page_config(page_title="이슈코드 · CMMS", page_icon="🏷️", layout="wide")
+inject_css()
 
-st.markdown("""
-<style>
-.page-header {
-    background: linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%);
-    color: white; padding: 20px 28px; border-radius: 12px; margin-bottom: 24px;
-}
-.page-header h1 { color: white; margin: 0; font-size: 1.6rem; }
-.page-header p { color: #BFDBFE; margin: 4px 0 0; font-size: 0.9rem; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="page-header">
-    <h1>🏷️ 이슈 코드 관리</h1>
-    <p>부품코드 + 이슈코드 조합 테이블 관리</p>
-</div>
-""", unsafe_allow_html=True)
+page_header("🏷️ 이슈 코드 관리", "부품코드 + 이슈코드 조합 테이블 관리")
 
 tab1, tab2 = st.tabs(["📋 코드 목록", "➕ 코드 추가"])
 
