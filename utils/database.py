@@ -99,6 +99,43 @@ def init_db():
         )
     """)
 
+    # 슬랙 보전요청 테이블
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS slack_requests (
+            id SERIAL PRIMARY KEY,
+            channel_id TEXT NOT NULL,
+            channel_name TEXT,
+            message_ts TEXT NOT NULL,
+            factory TEXT,
+            equipment TEXT,
+            symptom TEXT,
+            inspection TEXT,
+            assignee TEXT,
+            status TEXT DEFAULT '진행 중',
+            is_matched BOOLEAN DEFAULT FALSE,
+            maintenance_id INTEGER REFERENCES maintenance(id) ON DELETE SET NULL,
+            raw_text TEXT,
+            recv_date TEXT,
+            comp_date TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(channel_id, message_ts)
+        )
+    """)
+
+    # 슬랙 미매칭 데이터 테이블 (팩토리/설비명이 기존 데이터와 다를 때)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS slack_unmatched (
+            id SERIAL PRIMARY KEY,
+            slack_request_id INTEGER REFERENCES slack_requests(id) ON DELETE CASCADE,
+            factory_raw TEXT,
+            equipment_raw TEXT,
+            channel_name TEXT,
+            recv_date TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     conn.commit()
     _seed_issue_codes(c, conn)
     _seed_holidays_2026(c, conn)
@@ -644,3 +681,84 @@ def _safe_int(val):
         return int(float(val)) if val and str(val) != "nan" else 0
     except Exception:
         return 0
+
+
+# ─────────── 슬랙 연동 CRUD ───────────
+def upsert_slack_request(data: dict) -> int:
+    """슬랙 보전요청 저장 또는 갱신. 생성된/기존 id 반환."""
+    conn = get_conn()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        INSERT INTO slack_requests
+            (channel_id, channel_name, message_ts, factory, equipment,
+             symptom, inspection, assignee, status, is_matched, raw_text, recv_date, updated_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (channel_id, message_ts) DO UPDATE SET
+            status = EXCLUDED.status,
+            is_matched = EXCLUDED.is_matched,
+            comp_date = CASE
+                WHEN EXCLUDED.status='완료' AND slack_requests.comp_date IS NULL
+                THEN EXCLUDED.recv_date
+                ELSE slack_requests.comp_date
+            END,
+            updated_at = EXCLUDED.updated_at
+        RETURNING id
+    """, (
+        data["channel_id"], data.get("channel_name"), data["message_ts"],
+        data.get("factory"), data.get("equipment"),
+        data.get("symptom"), data.get("inspection"), data.get("assignee"),
+        data.get("status", "진행 중"), data.get("is_matched", False),
+        data.get("raw_text"), data.get("recv_date"), now,
+    ))
+    row = c.fetchone()
+    req_id = row[0] if row else None
+    conn.commit()
+    conn.close()
+    return req_id
+
+
+def save_slack_unmatched(slack_request_id: int, factory_raw: str, equipment_raw: str,
+                         channel_name: str, recv_date: str):
+    """미매칭 데이터 저장 (중복 방지)."""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id FROM slack_unmatched WHERE slack_request_id=%s", (slack_request_id,)
+    )
+    if c.fetchone() is None:
+        c.execute("""
+            INSERT INTO slack_unmatched (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date)
+            VALUES (%s,%s,%s,%s,%s)
+        """, (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date))
+        conn.commit()
+    conn.close()
+
+
+def get_slack_requests(status: str = None, channel_name: str = None) -> "pd.DataFrame":
+    conn = get_conn()
+    q = "SELECT * FROM slack_requests WHERE 1=1"
+    params = []
+    if status:
+        q += " AND status=%s"
+        params.append(status)
+    if channel_name:
+        q += " AND channel_name=%s"
+        params.append(channel_name)
+    q += " ORDER BY created_at DESC"
+    df = pd.read_sql_query(q, conn, params=params if params else None)
+    conn.close()
+    return df
+
+
+def get_slack_unmatched() -> "pd.DataFrame":
+    conn = get_conn()
+    df = pd.read_sql_query(
+        """SELECT su.*, sr.symptom, sr.inspection, sr.assignee, sr.status as req_status
+           FROM slack_unmatched su
+           LEFT JOIN slack_requests sr ON su.slack_request_id = sr.id
+           ORDER BY su.created_at DESC""",
+        conn,
+    )
+    conn.close()
+    return df
