@@ -2,7 +2,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 
 from utils.database import get_slack_requests, get_slack_unmatched, init_db
@@ -41,24 +41,12 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**동기화 범위**")
-    sync_range = st.selectbox(
-        "가져올 기간",
-        ["최근 1일", "최근 7일", "최근 30일", "전체"],
-        index=1,
+    full_resync = st.checkbox(
+        "전체 재수집",
+        value=False,
+        help="체크 시 처음부터 전부 다시 수집합니다. 평소에는 꺼두세요 (마지막 동기화 이후 새 메시지만 가져옴)",
     )
-
-    range_map = {
-        "최근 1일": 1,
-        "최근 7일": 7,
-        "최근 30일": 30,
-        "전체": None,
-    }
-    days = range_map[sync_range]
-
-    if days:
-        oldest_ts = str((datetime.utcnow() - timedelta(days=days)).timestamp())
-    else:
-        oldest_ts = "0"
+    oldest_ts = "0" if full_resync else "auto"
 
     sync_btn = st.button("🔄 지금 동기화", use_container_width=True, type="primary")
 
@@ -94,7 +82,7 @@ if sync_btn:
                     st.warning(f"⚠️ `{ch_name}`: {stats['error']}")
                 else:
                     st.info(
-                        f"📌 **{ch_name}** — 처리 {stats.get('new', 0)}건 "
+                        f"📌 **{ch_name}** — 처리 {stats.get('processed', 0)}건 "
                         f"/ 건너뜀 {stats.get('skipped', 0)}건 "
                         f"/ 미매칭 {stats.get('unmatched', 0)}건"
                     )

@@ -114,7 +114,6 @@ def init_db():
             status TEXT DEFAULT '진행 중',
             is_matched BOOLEAN DEFAULT FALSE,
             maintenance_id INTEGER REFERENCES maintenance(id) ON DELETE SET NULL,
-            raw_text TEXT,
             recv_date TEXT,
             comp_date TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -133,6 +132,16 @@ def init_db():
             channel_name TEXT,
             recv_date TEXT,
             created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
+    # 슬랙 채널별 마지막 동기화 타임스탬프
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS slack_sync_state (
+            channel_id TEXT PRIMARY KEY,
+            channel_name TEXT,
+            last_ts TEXT DEFAULT '0',
+            synced_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
 
@@ -692,8 +701,8 @@ def upsert_slack_request(data: dict) -> int:
     c.execute("""
         INSERT INTO slack_requests
             (channel_id, channel_name, message_ts, factory, equipment,
-             symptom, inspection, assignee, status, is_matched, raw_text, recv_date, updated_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+             symptom, inspection, assignee, status, is_matched, recv_date, updated_at)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         ON CONFLICT (channel_id, message_ts) DO UPDATE SET
             status = EXCLUDED.status,
             is_matched = EXCLUDED.is_matched,
@@ -709,13 +718,42 @@ def upsert_slack_request(data: dict) -> int:
         data.get("factory"), data.get("equipment"),
         data.get("symptom"), data.get("inspection"), data.get("assignee"),
         data.get("status", "진행 중"), data.get("is_matched", False),
-        data.get("raw_text"), data.get("recv_date"), now,
+        data.get("recv_date"), now,
     ))
     row = c.fetchone()
     req_id = row[0] if row else None
     conn.commit()
     conn.close()
     return req_id
+
+
+def get_slack_last_ts(channel_id: str) -> str:
+    """채널의 마지막 동기화 타임스탬프 반환. 없으면 '0'."""
+    try:
+        conn = get_conn()
+        c = conn.cursor()
+        c.execute("SELECT last_ts FROM slack_sync_state WHERE channel_id=%s", (channel_id,))
+        row = c.fetchone()
+        conn.close()
+        return row[0] if row else "0"
+    except Exception:
+        return "0"
+
+
+def save_slack_last_ts(channel_id: str, channel_name: str, last_ts: str):
+    """채널의 마지막 동기화 타임스탬프 저장."""
+    conn = get_conn()
+    c = conn.cursor()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("""
+        INSERT INTO slack_sync_state (channel_id, channel_name, last_ts, synced_at)
+        VALUES (%s,%s,%s,%s)
+        ON CONFLICT (channel_id) DO UPDATE SET
+            last_ts = EXCLUDED.last_ts,
+            synced_at = EXCLUDED.synced_at
+    """, (channel_id, channel_name, last_ts, now))
+    conn.commit()
+    conn.close()
 
 
 def save_slack_unmatched(slack_request_id: int, factory_raw: str, equipment_raw: str,
@@ -735,29 +773,36 @@ def save_slack_unmatched(slack_request_id: int, factory_raw: str, equipment_raw:
     conn.close()
 
 
+@st.cache_data(ttl=120)
 def get_slack_requests(status: str = None, channel_name: str = None) -> "pd.DataFrame":
     conn = get_conn()
-    q = "SELECT * FROM slack_requests WHERE 1=1"
+    q = """
+        SELECT id, channel_name, factory, equipment, symptom, inspection,
+               assignee, status, is_matched, recv_date, comp_date, updated_at
+        FROM slack_requests WHERE 1=1
+    """
     params = []
     if status:
         q += " AND status=%s"
         params.append(status)
     if channel_name:
-        q += " AND channel_name=%s"
-        params.append(channel_name)
-    q += " ORDER BY created_at DESC"
+        q += " AND channel_name ILIKE %s"
+        params.append(f"%{channel_name}%")
+    q += " ORDER BY recv_date DESC, id DESC LIMIT 500"
     df = pd.read_sql_query(q, conn, params=params if params else None)
     conn.close()
     return df
 
 
+@st.cache_data(ttl=120)
 def get_slack_unmatched() -> "pd.DataFrame":
     conn = get_conn()
     df = pd.read_sql_query(
-        """SELECT su.*, sr.symptom, sr.inspection, sr.assignee, sr.status as req_status
+        """SELECT su.recv_date, su.channel_name, su.factory_raw, su.equipment_raw,
+                  sr.symptom, sr.status as req_status
            FROM slack_unmatched su
            LEFT JOIN slack_requests sr ON su.slack_request_id = sr.id
-           ORDER BY su.created_at DESC""",
+           ORDER BY su.created_at DESC LIMIT 200""",
         conn,
     )
     conn.close()

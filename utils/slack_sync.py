@@ -21,6 +21,8 @@ from utils.database import (
     get_conn,
     upsert_slack_request,
     save_slack_unmatched,
+    get_slack_last_ts,
+    save_slack_last_ts,
 )
 
 # ─── 완료 판단 기준 ───────────────────────────────────────────────
@@ -215,14 +217,24 @@ def fetch_channel_messages(client: WebClient, channel_id: str, oldest: str = "0"
 
 # ─── 동기화 핵심 로직 ─────────────────────────────────────────────
 def sync_channel(client: WebClient, channel_id: str, channel_name: str,
-                 oldest: str = "0") -> dict:
+                 oldest: str = "auto") -> dict:
     """
     단일 채널의 보전요청 메시지를 DB에 동기화합니다.
-    반환: {"new": int, "updated": int, "skipped": int, "unmatched": int}
+    oldest='auto': 마지막 동기화 이후 메시지만 가져옴 (증분)
+    oldest='0'   : 전체 재수집
+    반환: {"processed": int, "skipped": int, "unmatched": int}
     """
-    stats = {"new": 0, "updated": 0, "skipped": 0, "unmatched": 0}
+    stats = {"processed": 0, "skipped": 0, "unmatched": 0}
+
+    # 증분 동기화: 'auto'면 마지막 저장된 ts 이후만 가져옴
+    if oldest == "auto":
+        oldest = get_slack_last_ts(channel_id)
 
     messages = fetch_channel_messages(client, channel_id, oldest=oldest)
+    if not messages:
+        return stats
+
+    latest_ts = oldest  # 이번 배치에서 가장 최신 ts 추적
 
     for msg in messages:
         text = msg.get("text", "") or ""
@@ -233,6 +245,8 @@ def sync_channel(client: WebClient, channel_id: str, channel_name: str,
             continue
 
         ts = msg["ts"]
+        if ts > latest_ts:
+            latest_ts = ts
 
         # Unix timestamp → 날짜 문자열
         recv_date = datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d")
@@ -252,7 +266,7 @@ def sync_channel(client: WebClient, channel_id: str, channel_name: str,
         eq_matched = match_equipment(parsed.get("equipment"))
         is_matched = fac_matched and eq_matched
 
-        # DB 저장
+        # DB 저장 (raw_text 없음 — 저장 공간 절약)
         req_id = upsert_slack_request({
             "channel_id": channel_id,
             "channel_name": channel_name,
@@ -264,7 +278,6 @@ def sync_channel(client: WebClient, channel_id: str, channel_name: str,
             "assignee": parsed.get("assignee"),
             "status": status,
             "is_matched": is_matched,
-            "raw_text": text[:2000],  # 최대 2000자
             "recv_date": recv_date,
         })
 
@@ -279,14 +292,20 @@ def sync_channel(client: WebClient, channel_id: str, channel_name: str,
             )
             stats["unmatched"] += 1
 
-        stats["new"] += 1  # upsert이므로 new/updated 구분 대신 총 처리 건수
+        stats["processed"] += 1
+
+    # 다음 동기화 시 증분 시작점으로 사용하도록 최신 ts 저장
+    if latest_ts and latest_ts != "0" and latest_ts != oldest:
+        save_slack_last_ts(channel_id, channel_name, latest_ts)
 
     return stats
 
 
-def run_full_sync(bot_token: str, oldest: str = "0") -> dict:
+def run_full_sync(bot_token: str, oldest: str = "auto") -> dict:
     """
     모든 보전요청 채널을 동기화합니다.
+    oldest='auto': 채널별 마지막 ts 이후만 가져옴 (증분, 기본값)
+    oldest='0'   : 전체 재수집
     반환: {channel_name: stats, ...}
     """
     client = WebClient(token=bot_token)
