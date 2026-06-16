@@ -39,7 +39,7 @@ COMPLETION_REACTIONS = {
 }
 
 # 워크플로우 봇 메시지를 구분하는 키워드 (본문에 포함된 경우 워크플로우로 판단)
-WORKFLOW_KEYWORDS = ["팩토리", "설비명", "증상", "점검사항"]
+WORKFLOW_KEYWORDS = ["팩토리", "설비명", "증상", "점검"]
 
 
 # ─── 메시지 파싱 ─────────────────────────────────────────────────
@@ -70,7 +70,7 @@ def parse_workflow_message(text: str) -> dict:
         "factory":    r"팩토리\s*[:：]\s*(.+)",
         "equipment":  r"설비명\s*(?:or\s*위치)?\s*[:：]\s*(.+)",
         "symptom":    r"증상\s*[:：]\s*(.+)",
-        "inspection": r"점검사항\s*[:：]\s*(.+)",
+        "inspection": r"점검\s*사\s*항\s*[:：]\s*(.+)",  # '점검사항' / '점검 사항' 모두 허용
         "assignee":   r"담당자\s*[:：]\s*(.+)",
     }
 
