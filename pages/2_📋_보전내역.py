@@ -6,7 +6,7 @@ from utils.database import (
     get_equipment, get_issue_code_options, get_issue_codes, init_db
 )
 from utils.constants import FACTORIES, MAINTENANCE_STATUS_LIST as STATUS_LIST, SHIFT_LIST, RECV_TYPE_LIST, CONTRACTOR_LIST
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
 from datetime import datetime, date
 
@@ -51,12 +51,12 @@ with tab1:
         done = len(df[df["status"] == "완료"])
         pending = len(df[df["status"].isin(["진행 중", "팬딩"])])
         rate = round(done / total * 100, 1) if total else 0
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("총 건수", f"{total:,}건")
-        m2.metric("완료", f"{done:,}건")
-        m3.metric("미완료", f"{pending:,}건")
-        m4.metric("처리율", f"{rate}%")
-        st.markdown("")
+        kpi_cards([
+            {"label": "총 건수",  "value": f"{total:,}건", "icon": "📦", "color": "blue",   "sub": "전체 접수"},
+            {"label": "완료",    "value": f"{done:,}건",  "icon": "✅", "color": "green",  "sub": "처리 완료"},
+            {"label": "미완료",  "value": f"{pending:,}건","icon": "⏳", "color": "amber",  "sub": "진행 중 + 팬딩"},
+            {"label": "처리율",  "value": f"{rate}%",     "icon": "📈", "color": "purple", "sub": "목표 95%"},
+        ])
 
     if df.empty:
         st.info("조회된 데이터가 없습니다.")

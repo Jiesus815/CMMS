@@ -2,7 +2,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, init_db
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -29,15 +29,13 @@ with col_f1:
 
 # ─── KPI 카드 ───
 kpi = get_kpi(year_sel)
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("📥 총 보전 건수", f"{kpi['total']:,}건")
-c2.metric("✅ 완료", f"{kpi['done']:,}건")
-c3.metric("⏳ 미완료", f"{kpi['pending']:,}건",
-          delta=f"-{kpi['pending']}건 주의" if kpi['pending'] > 0 else None,
-          delta_color="inverse")
-c4.metric("📈 처리율", f"{kpi['rate']}%",
-          delta="목표 95%" if kpi['rate'] < 95 else "목표 달성 ✓")
-c5.metric("⏱️ 평균 고장시간", f"{kpi['avg_down']}분")
+kpi_cards([
+    {"label": "총 보전 건수", "value": f"{kpi['total']:,}건",  "icon": "📥", "color": "blue",   "sub": "전체 접수"},
+    {"label": "완료",         "value": f"{kpi['done']:,}건",   "icon": "✅", "color": "green",  "sub": "처리 완료"},
+    {"label": "미완료",       "value": f"{kpi['pending']:,}건","icon": "⏳", "color": "amber",  "sub": "진행 중 + 팬딩"},
+    {"label": "처리율",       "value": f"{kpi['rate']}%",      "icon": "📈", "color": "purple", "sub": "목표 95%"},
+    {"label": "평균 고장시간","value": f"{kpi['avg_down']}분", "icon": "⏱️", "color": "red",    "sub": "분 단위"},
+])
 
 st.markdown("---")
 
