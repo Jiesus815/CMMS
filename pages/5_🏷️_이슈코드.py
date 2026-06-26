@@ -2,7 +2,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_conn, init_db
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
 
 init_db()
@@ -32,7 +32,7 @@ with tab1:
         )
         df = df[mask]
 
-    st.metric("조회 건수", f"{len(df)}개")
+    kpi_cards([{"label": "조회 건수", "value": f"{len(df)}개", "icon": "🏷️", "color": "blue", "sub": "이슈코드 항목"}])
     df_show = df.rename(columns={
         "id": "ID", "part_name": "부품명", "part_name_en": "부품명(영문)",
         "part_code": "부품코드", "issue_name": "이슈명", "issue_name_en": "이슈명(영문)",
