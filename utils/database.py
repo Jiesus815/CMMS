@@ -319,8 +319,10 @@ def get_maintenance(factory=None, status=None, year=None, month=None, week=None)
     return df
 
 
-def insert_maintenance(data: dict):
-    conn = get_conn()
+def insert_maintenance(data: dict, conn=None):
+    own = conn is None
+    if own:
+        conn = get_conn()
     c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -373,15 +375,16 @@ def insert_maintenance(data: dict):
         data.get("issue_desc"), data.get("root_cause"), data.get("slack_link"),
         now, now
     ))
-    conn.commit()
     eq_code = data.get("equipment_code")
     status = data.get("status", "진행 중")
     if eq_code:
-        _sync_equipment_status(conn, eq_code, status)
-    conn.close()
+        _sync_equipment_status(conn, eq_code, status, commit=False)
+    if own:
+        conn.commit()
+        conn.close()
 
 
-def _sync_equipment_status(conn, equipment_code: str, maint_status: str):
+def _sync_equipment_status(conn, equipment_code: str, maint_status: str, commit: bool = True):
     if maint_status == "진행 중":
         eq_status = "점검중"
     elif maint_status == "팬딩":
@@ -394,7 +397,8 @@ def _sync_equipment_status(conn, equipment_code: str, maint_status: str):
         return
     c = conn.cursor()
     c.execute("UPDATE equipment SET status=%s WHERE equipment_code=%s", (eq_status, equipment_code))
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def update_maintenance(m_id: int, data: dict):
@@ -472,14 +476,15 @@ def get_kpi(year=None):
     else:
         where = ""
         params = ()
-    c.execute(f"SELECT COUNT(*) FROM maintenance {where}", params)
-    total = c.fetchone()[0]
-    c.execute(f"SELECT COUNT(*) FROM maintenance {where} {'AND' if where else 'WHERE'} status='완료'", params)
-    done = c.fetchone()[0]
-    c.execute(f"SELECT COUNT(*) FROM maintenance {where} {'AND' if where else 'WHERE'} status IN ('진행 중','팬딩')", params)
-    pending = c.fetchone()[0]
-    c.execute(f"SELECT AVG(downtime_min) FROM maintenance {where} {'AND' if where else 'WHERE'} downtime_min > 0", params)
-    avg_down = c.fetchone()[0]
+    c.execute(f"""
+        SELECT
+            COUNT(*),
+            COUNT(*) FILTER (WHERE status='완료'),
+            COUNT(*) FILTER (WHERE status IN ('진행 중','팬딩')),
+            AVG(downtime_min) FILTER (WHERE downtime_min > 0)
+        FROM maintenance {where}
+    """, params)
+    total, done, pending, avg_down = c.fetchone()
     conn.close()
     rate = round(done / total * 100, 1) if total else 0
     return {
@@ -619,6 +624,7 @@ def import_from_excel(file_path: str) -> dict:
         if maint_sheet:
             df_m = xl.parse(maint_sheet, header=1)
             df_m.columns = [str(c).strip() for c in df_m.columns]
+            conn_m = get_conn()
             for _, row in df_m.iterrows():
                 try:
                     factory = str(row.get("팩토리", "")).split("주")[0].split("야")[0].strip()
@@ -674,10 +680,13 @@ def import_from_excel(file_path: str) -> dict:
                         "issue_desc": str(row.get("이상 접수 내용", "")).strip(),
                         "root_cause": str(row.get("발생원인", "")).strip(),
                     }
-                    insert_maintenance(data)
+                    insert_maintenance(data, conn=conn_m)
+                    conn_m.commit()
                     results["maintenance"] += 1
                 except Exception as e:
+                    conn_m.rollback()
                     results["errors"].append(f"보전: {e}")
+            conn_m.close()
 
     except Exception as e:
         results["errors"].append(str(e))
