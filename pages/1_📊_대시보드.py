@@ -2,7 +2,7 @@ import streamlit as st
 import sys, os
 import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, init_db
+from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, get_available_years, init_db
 from utils.style import inject_css, page_header, kpi_cards
 import plotly.express as px
 import plotly.graph_objects as go
@@ -23,9 +23,12 @@ current_year = datetime.now().year
 page_header("📊 대시보드", f"보전 현황 한눈에 보기 · {datetime.now().strftime('%Y년 %m월 %d일')}")
 
 # ─── 연도 필터 ───
+year_options = get_available_years()
+if current_year not in year_options:
+    year_options = [current_year] + year_options
 col_f1, col_f2 = st.columns([1, 5])
 with col_f1:
-    year_sel = st.selectbox("연도", [current_year, current_year - 1], index=0, label_visibility="collapsed")
+    year_sel = st.selectbox("연도", year_options, index=0, label_visibility="collapsed")
 
 # ─── KPI 카드 ───
 kpi = get_kpi(year_sel)

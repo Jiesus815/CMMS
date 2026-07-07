@@ -70,6 +70,8 @@ if sync_btn:
             try:
                 from utils.slack_sync import run_full_sync
                 results = run_full_sync(bot_token, oldest=oldest_ts)
+                # 동기화 결과가 즉시 목록에 반영되도록 조회 캐시 무효화
+                st.cache_data.clear()
             except Exception as e:
                 st.error(f"동기화 오류: {e}")
                 results = {}

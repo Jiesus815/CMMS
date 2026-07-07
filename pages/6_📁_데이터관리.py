@@ -1,7 +1,7 @@
 import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import import_from_excel, init_db, get_conn, get_maintenance, get_equipment
+from utils.database import import_from_excel, init_db, get_conn, get_maintenance, get_equipment, clear_maintenance, clear_all_data
 from utils.style import inject_css, page_header
 import tempfile
 from datetime import datetime
@@ -126,11 +126,8 @@ with tab3:
             confirm1 = st.text_input("확인 문구 입력 ('삭제확인')", key="c1")
             if st.button("🗑️ 보전내역 전체 삭제", use_container_width=True):
                 if confirm1 == "삭제확인":
-                    conn = get_conn()
-                    c = conn.cursor()
-                    c.execute("DELETE FROM maintenance")
-                    conn.commit()
-                    conn.close()
+                    clear_maintenance()
+                    st.cache_data.clear()
                     st.success("보전내역이 삭제되었습니다.")
                 else:
                     st.error("확인 문구가 일치하지 않습니다.")
@@ -140,12 +137,8 @@ with tab3:
             confirm2 = st.text_input("확인 문구 입력 ('전체초기화')", key="c2")
             if st.button("💥 전체 DB 초기화", use_container_width=True):
                 if confirm2 == "전체초기화":
-                    conn = get_conn()
-                    c = conn.cursor()
-                    c.execute("DELETE FROM maintenance")
-                    c.execute("DELETE FROM equipment")
-                    conn.commit()
-                    conn.close()
+                    clear_all_data()
+                    st.cache_data.clear()
                     st.success("전체 데이터가 초기화되었습니다.")
                 else:
                     st.error("확인 문구가 일치하지 않습니다.")

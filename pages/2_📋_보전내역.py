@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import (
     get_maintenance, insert_maintenance, update_maintenance, delete_maintenance,
-    get_equipment, get_issue_code_options, get_issue_codes, init_db
+    get_equipment, get_issue_code_options, get_issue_codes, get_available_years, init_db
 )
 from utils.constants import FACTORIES, MAINTENANCE_STATUS_LIST as STATUS_LIST, SHIFT_LIST, RECV_TYPE_LIST, CONTRACTOR_LIST
 from utils.style import inject_css, page_header, kpi_cards
@@ -30,7 +30,7 @@ with tab1:
     with fc2:
         f_status = st.selectbox("진행상태", ["전체"] + STATUS_LIST, key="f_st")
     with fc3:
-        f_year = st.selectbox("연도", ["전체", 2026, 2025], key="f_yr")
+        f_year = st.selectbox("연도", ["전체"] + get_available_years(), key="f_yr")
     with fc4:
         f_month = st.selectbox("월", ["전체"] + list(range(1, 13)), key="f_mo")
     with fc5:

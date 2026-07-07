@@ -1,6 +1,7 @@
 import os
 import psycopg2
 import pandas as pd
+from contextlib import contextmanager
 from datetime import datetime
 
 try:
@@ -15,6 +16,32 @@ def get_conn():
     if url and "sslmode" not in url:
         url += "?sslmode=require"
     return psycopg2.connect(url)
+
+
+@contextmanager
+def db_connection():
+    """커넥션을 안전하게 열고, 예외 발생 여부와 무관하게 반드시 닫는다."""
+    conn = get_conn()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def db_cursor(commit: bool = False):
+    """커서를 열고, 정상 종료 시 (commit=True면) 커밋, 예외 시 롤백, 항상 커넥션을 닫는다."""
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        yield conn, cur
+        if commit:
+            conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 @st.cache_resource
@@ -248,7 +275,6 @@ def _seed_holidays_2026(c, conn):
 
 # ─────────── 설비 CRUD ───────────
 def get_equipment(factory=None, status=None):
-    conn = get_conn()
     q = "SELECT * FROM equipment WHERE 1=1"
     params = []
     if factory:
@@ -258,44 +284,36 @@ def get_equipment(factory=None, status=None):
         q += " AND status=%s"
         params.append(status)
     q += " ORDER BY factory, equipment_code"
-    df = pd.read_sql_query(q, conn, params=params if params else None)
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=params if params else None)
 
 
 def upsert_equipment(data: dict):
-    conn = get_conn()
-    c = conn.cursor()
-    if data.get("id"):
-        c.execute("""
-            UPDATE equipment SET factory=%s,equipment_code=%s,equipment_name=%s,
-            location=%s,category=%s,status=%s,install_date=%s,memo=%s
-            WHERE id=%s
-        """, (data["factory"], data["equipment_code"], data["equipment_name"],
-              data.get("location"), data.get("category"), data.get("status","정상"),
-              data.get("install_date"), data.get("memo"), data["id"]))
-    else:
-        c.execute("""
-            INSERT INTO equipment (factory,equipment_code,equipment_name,location,category,status,install_date,memo)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-        """, (data["factory"], data["equipment_code"], data["equipment_name"],
-              data.get("location"), data.get("category"), data.get("status","정상"),
-              data.get("install_date"), data.get("memo")))
-    conn.commit()
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        if data.get("id"):
+            c.execute("""
+                UPDATE equipment SET factory=%s,equipment_code=%s,equipment_name=%s,
+                location=%s,category=%s,status=%s,install_date=%s,memo=%s
+                WHERE id=%s
+            """, (data["factory"], data["equipment_code"], data["equipment_name"],
+                  data.get("location"), data.get("category"), data.get("status","정상"),
+                  data.get("install_date"), data.get("memo"), data["id"]))
+        else:
+            c.execute("""
+                INSERT INTO equipment (factory,equipment_code,equipment_name,location,category,status,install_date,memo)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (data["factory"], data["equipment_code"], data["equipment_name"],
+                  data.get("location"), data.get("category"), data.get("status","정상"),
+                  data.get("install_date"), data.get("memo")))
 
 
 def delete_equipment(eq_id: int):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("DELETE FROM equipment WHERE id=%s", (eq_id,))
-    conn.commit()
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM equipment WHERE id=%s", (eq_id,))
 
 
 # ─────────── 보전내역 CRUD ───────────
 def get_maintenance(factory=None, status=None, year=None, month=None, week=None):
-    conn = get_conn()
     q = "SELECT * FROM maintenance WHERE 1=1"
     params = []
     if factory:
@@ -314,9 +332,8 @@ def get_maintenance(factory=None, status=None, year=None, month=None, week=None)
         q += " AND recv_week=%s"
         params.append(week)
     q += " ORDER BY recv_date DESC, id DESC"
-    df = pd.read_sql_query(q, conn, params=params if params else None)
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=params if params else None)
 
 
 def insert_maintenance(data: dict, conn=None):
@@ -402,8 +419,6 @@ def _sync_equipment_status(conn, equipment_code: str, maint_status: str, commit:
 
 
 def update_maintenance(m_id: int, data: dict):
-    conn = get_conn()
-    c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     comp_date = data.get("comp_date", "")
@@ -418,47 +433,41 @@ def update_maintenance(m_id: int, data: dict):
     else:
         comp_year = comp_month = comp_week = None
 
-    c.execute("""
-        UPDATE maintenance SET
-            factory=%s, shift=%s, status=%s, region=%s, equipment_code=%s, equipment_name=%s,
-            issue_code=%s, comp_year=%s, comp_month=%s, comp_week=%s,
-            comp_date=%s, comp_hour=%s, comp_min=%s,
-            downtime_min=%s, loss_time=%s, assignee=%s, contractor_type=%s,
-            recv_type=%s, issue_desc=%s, root_cause=%s, slack_link=%s, updated_at=%s
-        WHERE id=%s
-    """, (
-        data.get("factory"), data.get("shift"), data.get("status"),
-        data.get("region"), data.get("equipment_code"), data.get("equipment_name"),
-        data.get("issue_code"),
-        comp_year, comp_month, comp_week,
-        comp_date, data.get("comp_hour"), data.get("comp_min"),
-        data.get("downtime_min", 0), data.get("loss_time", 0),
-        data.get("assignee"), data.get("contractor_type"),
-        data.get("recv_type"), data.get("issue_desc"), data.get("root_cause"),
-        data.get("slack_link"), now, m_id
-    ))
-    conn.commit()
-    eq_code = data.get("equipment_code")
-    status = data.get("status")
-    if eq_code and status:
-        _sync_equipment_status(conn, eq_code, status)
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("""
+            UPDATE maintenance SET
+                factory=%s, shift=%s, status=%s, region=%s, equipment_code=%s, equipment_name=%s,
+                issue_code=%s, comp_year=%s, comp_month=%s, comp_week=%s,
+                comp_date=%s, comp_hour=%s, comp_min=%s,
+                downtime_min=%s, loss_time=%s, assignee=%s, contractor_type=%s,
+                recv_type=%s, issue_desc=%s, root_cause=%s, slack_link=%s, updated_at=%s
+            WHERE id=%s
+        """, (
+            data.get("factory"), data.get("shift"), data.get("status"),
+            data.get("region"), data.get("equipment_code"), data.get("equipment_name"),
+            data.get("issue_code"),
+            comp_year, comp_month, comp_week,
+            comp_date, data.get("comp_hour"), data.get("comp_min"),
+            data.get("downtime_min", 0), data.get("loss_time", 0),
+            data.get("assignee"), data.get("contractor_type"),
+            data.get("recv_type"), data.get("issue_desc"), data.get("root_cause"),
+            data.get("slack_link"), now, m_id
+        ))
+        eq_code = data.get("equipment_code")
+        status = data.get("status")
+        if eq_code and status:
+            _sync_equipment_status(conn, eq_code, status, commit=False)
 
 
 def delete_maintenance(m_id: int):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("DELETE FROM maintenance WHERE id=%s", (m_id,))
-    conn.commit()
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM maintenance WHERE id=%s", (m_id,))
 
 
 # ─────────── 이슈코드 조회 ───────────
 def get_issue_codes():
-    conn = get_conn()
-    df = pd.read_sql_query("SELECT DISTINCT full_code, part_name, issue_name FROM issue_code ORDER BY full_code", conn)
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query("SELECT DISTINCT full_code, part_name, issue_name FROM issue_code ORDER BY full_code", conn)
 
 
 def get_issue_code_options():
@@ -467,25 +476,37 @@ def get_issue_code_options():
 
 
 # ─────────── 통계 쿼리 ───────────
+def get_available_years():
+    """maintenance에 존재하는 접수 연도 목록(내림차순). 없으면 올해 연도 1개."""
+    from datetime import datetime as _dt
+    with db_connection() as conn:
+        df = pd.read_sql_query(
+            "SELECT DISTINCT recv_year FROM maintenance WHERE recv_year IS NOT NULL ORDER BY recv_year DESC",
+            conn,
+        )
+    years = [int(y) for y in df["recv_year"].tolist()] if not df.empty else []
+    if not years:
+        years = [_dt.now().year]
+    return years
+
+
 def get_kpi(year=None):
-    conn = get_conn()
-    c = conn.cursor()
     if year:
         where = "WHERE recv_year=%s"
         params = (year,)
     else:
         where = ""
         params = ()
-    c.execute(f"""
-        SELECT
-            COUNT(*),
-            COUNT(*) FILTER (WHERE status='완료'),
-            COUNT(*) FILTER (WHERE status IN ('진행 중','팬딩')),
-            AVG(downtime_min) FILTER (WHERE downtime_min > 0)
-        FROM maintenance {where}
-    """, params)
-    total, done, pending, avg_down = c.fetchone()
-    conn.close()
+    with db_cursor() as (conn, c):
+        c.execute(f"""
+            SELECT
+                COUNT(*),
+                COUNT(*) FILTER (WHERE status='완료'),
+                COUNT(*) FILTER (WHERE status IN ('진행 중','팬딩')),
+                AVG(downtime_min) FILTER (WHERE downtime_min > 0)
+            FROM maintenance {where}
+        """, params)
+        total, done, pending, avg_down = c.fetchone()
     rate = round(done / total * 100, 1) if total else 0
     return {
         "total": total,
@@ -497,58 +518,51 @@ def get_kpi(year=None):
 
 
 def get_monthly_count(year=None):
-    conn = get_conn()
     if year:
         where = "WHERE recv_year=%s"
         params = [year]
     else:
         where = ""
         params = []
-    df = pd.read_sql_query(
-        f"SELECT recv_month as 월, COUNT(*) as 건수 FROM maintenance {where} GROUP BY recv_month ORDER BY recv_month",
-        conn,
-        params=params if params else None,
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            f"SELECT recv_month as 월, COUNT(*) as 건수 FROM maintenance {where} GROUP BY recv_month ORDER BY recv_month",
+            conn,
+            params=params if params else None,
+        )
 
 
 def get_factory_count(year=None):
-    conn = get_conn()
     if year:
         where = "WHERE recv_year=%s"
         params = [year]
     else:
         where = ""
         params = []
-    df = pd.read_sql_query(
-        f"SELECT factory as 팩토리, COUNT(*) as 건수 FROM maintenance {where} GROUP BY factory ORDER BY 건수 DESC",
-        conn,
-        params=params if params else None,
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            f"SELECT factory as 팭토리, COUNT(*) as 건수 FROM maintenance {where} GROUP BY factory ORDER BY 건수 DESC",
+            conn,
+            params=params if params else None,
+        )
 
 
 def get_issue_top(year=None, limit=15):
-    conn = get_conn()
     if year:
         where = "WHERE recv_year=%s AND"
         params = [year]
     else:
         where = "WHERE"
         params = []
-    df = pd.read_sql_query(
-        f"SELECT issue_code as 이슈코드, COUNT(*) as 건수 FROM maintenance {where} issue_code IS NOT NULL GROUP BY issue_code ORDER BY 건수 DESC LIMIT {limit}",
-        conn,
-        params=params if params else None,
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            f"SELECT issue_code as 이슈코드, COUNT(*) as 건수 FROM maintenance {where} issue_code IS NOT NULL GROUP BY issue_code ORDER BY 건수 DESC LIMIT {limit}",
+            conn,
+            params=params if params else None,
+        )
 
 
 def get_weekly_pivot(year=None, factory=None):
-    conn = get_conn()
     where_parts = []
     params = []
     if year:
@@ -558,34 +572,30 @@ def get_weekly_pivot(year=None, factory=None):
         where_parts.append("factory=%s")
         params.append(factory)
     where = "WHERE " + " AND ".join(where_parts) if where_parts else ""
-    df = pd.read_sql_query(
-        f"""SELECT factory, equipment_code, equipment_name, recv_week, COUNT(*) as cnt
-            FROM maintenance {where}
-            GROUP BY factory, equipment_code, equipment_name, recv_week
-            ORDER BY factory, equipment_code, recv_week""",
-        conn,
-        params=params if params else None,
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            f"""SELECT factory, equipment_code, equipment_name, recv_week, COUNT(*) as cnt
+                FROM maintenance {where}
+                GROUP BY factory, equipment_code, equipment_name, recv_week
+                ORDER BY factory, equipment_code, recv_week""",
+            conn,
+            params=params if params else None,
+        )
 
 
 def get_overdue(days=30):
-    conn = get_conn()
-    df = pd.read_sql_query(
-        """SELECT id, factory, equipment_code, equipment_name, recv_date, status, issue_desc,
-            (CURRENT_DATE - recv_date::date)::INTEGER as 경과일수
-            FROM maintenance
-            WHERE status IN ('진행 중','팬딩')
-            AND recv_date IS NOT NULL
-            AND recv_date != ''
-            AND (CURRENT_DATE - recv_date::date)::INTEGER >= %s
-            ORDER BY 경과일수 DESC""",
-        conn,
-        params=[days],
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            """SELECT id, factory, equipment_code, equipment_name, recv_date, status, issue_desc,
+                (CURRENT_DATE - recv_date::date)::INTEGER as 경과일수
+                FROM maintenance
+                WHERE status IN ('진행 중','팬딩')
+                AND recv_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                AND (CURRENT_DATE - recv_date::date)::INTEGER >= %s
+                ORDER BY 경과일수 DESC""",
+            conn,
+            params=[days],
+        )
 
 
 # ─────────── Excel Import ───────────
@@ -704,46 +714,40 @@ def _safe_int(val):
 # ─────────── 슬랙 연동 CRUD ───────────
 def upsert_slack_request(data: dict) -> int:
     """슬랙 보전요청 저장 또는 갱신. 생성된/기존 id 반환."""
-    conn = get_conn()
-    c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute("""
-        INSERT INTO slack_requests
-            (channel_id, channel_name, message_ts, factory, equipment,
-             symptom, inspection, assignee, status, is_matched, recv_date, updated_at)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT (channel_id, message_ts) DO UPDATE SET
-            status = EXCLUDED.status,
-            is_matched = EXCLUDED.is_matched,
-            comp_date = CASE
-                WHEN EXCLUDED.status='완료' AND slack_requests.comp_date IS NULL
-                THEN EXCLUDED.recv_date
-                ELSE slack_requests.comp_date
-            END,
-            updated_at = EXCLUDED.updated_at
-        RETURNING id
-    """, (
-        data["channel_id"], data.get("channel_name"), data["message_ts"],
-        data.get("factory"), data.get("equipment"),
-        data.get("symptom"), data.get("inspection"), data.get("assignee"),
-        data.get("status", "진행 중"), data.get("is_matched", False),
-        data.get("recv_date"), now,
-    ))
-    row = c.fetchone()
-    req_id = row[0] if row else None
-    conn.commit()
-    conn.close()
-    return req_id
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("""
+            INSERT INTO slack_requests
+                (channel_id, channel_name, message_ts, factory, equipment,
+                 symptom, inspection, assignee, status, is_matched, recv_date, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (channel_id, message_ts) DO UPDATE SET
+                status = EXCLUDED.status,
+                is_matched = EXCLUDED.is_matched,
+                comp_date = CASE
+                    WHEN EXCLUDED.status='완료' AND slack_requests.comp_date IS NULL
+                    THEN EXCLUDED.recv_date
+                    ELSE slack_requests.comp_date
+                END,
+                updated_at = EXCLUDED.updated_at
+            RETURNING id
+        """, (
+            data["channel_id"], data.get("channel_name"), data["message_ts"],
+            data.get("factory"), data.get("equipment"),
+            data.get("symptom"), data.get("inspection"), data.get("assignee"),
+            data.get("status", "진행 중"), data.get("is_matched", False),
+            data.get("recv_date"), now,
+        ))
+        row = c.fetchone()
+        return row[0] if row else None
 
 
 def get_slack_last_ts(channel_id: str) -> str:
     """채널의 마지막 동기화 타임스탬프 반환. 없으면 '0'."""
     try:
-        conn = get_conn()
-        c = conn.cursor()
-        c.execute("SELECT last_ts FROM slack_sync_state WHERE channel_id=%s", (channel_id,))
-        row = c.fetchone()
-        conn.close()
+        with db_cursor() as (conn, c):
+            c.execute("SELECT last_ts FROM slack_sync_state WHERE channel_id=%s", (channel_id,))
+            row = c.fetchone()
         return row[0] if row else "0"
     except Exception:
         return "0"
@@ -751,40 +755,33 @@ def get_slack_last_ts(channel_id: str) -> str:
 
 def save_slack_last_ts(channel_id: str, channel_name: str, last_ts: str):
     """채널의 마지막 동기화 타임스탬프 저장."""
-    conn = get_conn()
-    c = conn.cursor()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute("""
-        INSERT INTO slack_sync_state (channel_id, channel_name, last_ts, synced_at)
-        VALUES (%s,%s,%s,%s)
-        ON CONFLICT (channel_id) DO UPDATE SET
-            last_ts = EXCLUDED.last_ts,
-            synced_at = EXCLUDED.synced_at
-    """, (channel_id, channel_name, last_ts, now))
-    conn.commit()
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("""
+            INSERT INTO slack_sync_state (channel_id, channel_name, last_ts, synced_at)
+            VALUES (%s,%s,%s,%s)
+            ON CONFLICT (channel_id) DO UPDATE SET
+                last_ts = EXCLUDED.last_ts,
+                synced_at = EXCLUDED.synced_at
+        """, (channel_id, channel_name, last_ts, now))
 
 
 def save_slack_unmatched(slack_request_id: int, factory_raw: str, equipment_raw: str,
                          channel_name: str, recv_date: str):
     """미매칭 데이터 저장 (중복 방지)."""
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute(
-        "SELECT id FROM slack_unmatched WHERE slack_request_id=%s", (slack_request_id,)
-    )
-    if c.fetchone() is None:
-        c.execute("""
-            INSERT INTO slack_unmatched (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date)
-            VALUES (%s,%s,%s,%s,%s)
-        """, (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date))
-        conn.commit()
-    conn.close()
+    with db_cursor(commit=True) as (conn, c):
+        c.execute(
+            "SELECT id FROM slack_unmatched WHERE slack_request_id=%s", (slack_request_id,)
+        )
+        if c.fetchone() is None:
+            c.execute("""
+                INSERT INTO slack_unmatched (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date)
+                VALUES (%s,%s,%s,%s,%s)
+            """, (slack_request_id, factory_raw, equipment_raw, channel_name, recv_date))
 
 
 @st.cache_data(ttl=120)
 def get_slack_requests(status: str = None, channel_name: str = None) -> "pd.DataFrame":
-    conn = get_conn()
     q = """
         SELECT id, channel_name, factory, equipment, symptom, inspection,
                assignee, status, is_matched, recv_date, comp_date, updated_at
@@ -798,21 +795,37 @@ def get_slack_requests(status: str = None, channel_name: str = None) -> "pd.Data
         q += " AND channel_name ILIKE %s"
         params.append(f"%{channel_name}%")
     q += " ORDER BY recv_date DESC, id DESC LIMIT 500"
-    df = pd.read_sql_query(q, conn, params=params if params else None)
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=params if params else None)
 
 
 @st.cache_data(ttl=120)
 def get_slack_unmatched() -> "pd.DataFrame":
-    conn = get_conn()
-    df = pd.read_sql_query(
-        """SELECT su.recv_date, su.channel_name, su.factory_raw, su.equipment_raw,
-                  sr.symptom, sr.status as req_status
-           FROM slack_unmatched su
-           LEFT JOIN slack_requests sr ON su.slack_request_id = sr.id
-           ORDER BY su.created_at DESC LIMIT 200""",
-        conn,
-    )
-    conn.close()
-    return df
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            """SELECT su.recv_date, su.channel_name, su.factory_raw, su.equipment_raw,
+                      sr.symptom, sr.status as req_status
+               FROM slack_unmatched su
+               LEFT JOIN slack_requests sr ON su.slack_request_id = sr.id
+               ORDER BY su.created_at DESC LIMIT 200""",
+            conn,
+        )
+
+
+# ─────────── 데이터 초기화 ───────────
+def clear_maintenance():
+    """보전내역만 삭제하고 설비 상태를 정상으로 복구."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM maintenance")
+        c.execute("UPDATE equipment SET status='정상'")
+
+
+def clear_all_data():
+    """전체 운영 데이터 초기화 (보전내역·설비·슬랙 수집 데이터 포함)."""
+    with db_cursor(commit=True) as (conn, c):
+        # 슬랙 데이터는 FK로 maintenance/서로 연결되어 있으므로 먼저 정리
+        c.execute("DELETE FROM slack_unmatched")
+        c.execute("DELETE FROM slack_requests")
+        c.execute("DELETE FROM slack_sync_state")
+        c.execute("DELETE FROM maintenance")
+        c.execute("DELETE FROM equipment")

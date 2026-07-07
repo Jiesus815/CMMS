@@ -1,7 +1,7 @@
 import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import get_weekly_pivot, get_maintenance, init_db
+from utils.database import get_weekly_pivot, get_maintenance, get_available_years, init_db
 from utils.constants import FACTORIES
 from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
@@ -17,7 +17,7 @@ FACTORIES_WITH_ALL = ["전체"] + FACTORIES
 
 fc1, fc2 = st.columns([1, 1])
 with fc1:
-    year_sel = st.selectbox("연도", [2026, 2025])
+    year_sel = st.selectbox("연도", get_available_years())
 with fc2:
     fac_sel = st.selectbox("팩토리", FACTORIES_WITH_ALL)
 
