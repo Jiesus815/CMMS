@@ -163,6 +163,26 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .chart-title .ct-dot { width:8px; height:8px; border-radius:50%; background: linear-gradient(145deg,var(--iris),var(--gold)); box-shadow:0 0 0 3px rgba(110,98,230,.14); flex-shrink:0; }
 .chart-cap { font-size:.72rem; color: var(--tx3); margin:0 0 10px 17px; font-weight:500; }
 
+/* ── 레코드 카드 리스트 (표 대체) ── */
+.rec-scroll { max-height: 500px; overflow-y: auto; padding-right: 6px; margin-top: 4px; }
+.rec-card {
+    background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.78));
+    border: 1px solid var(--border); border-left: 3px solid var(--iris);
+    border-radius: var(--r-md); padding: 13px 16px; margin-bottom: 10px;
+    box-shadow: var(--sh-sm); transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+    animation: rise .4s var(--ease) both;
+}
+.rec-card:hover { transform: translateX(3px); box-shadow: var(--sh-md); }
+.rec-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.rec-seq { font-size:.72rem; font-weight:800; color:var(--tx3); min-width:24px; }
+.rec-name { font-weight:700; font-size:.95rem; color:var(--tx1); letter-spacing:-.01em; }
+.rec-sub { font-size:.78rem; color:var(--tx3); font-weight:500; }
+.rec-spacer { flex:1; }
+.rec-fac { font-size:.7rem; font-weight:700; color:var(--iris-ink); background:rgba(110,98,230,.09); padding:2px 10px; border-radius:999px; white-space:nowrap; }
+.rec-meta { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px; font-size:.78rem; color:var(--tx2); }
+.rec-meta b { color:var(--tx1); font-weight:600; font-variant-numeric:tabular-nums; }
+.rec-desc { margin-top:8px; font-size:.82rem; color:var(--tx2); line-height:1.5; border-top:1px dashed var(--border); padding-top:7px; }
+
 /* ── st.metric ── */
 [data-testid="stMetric"] {
     background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);

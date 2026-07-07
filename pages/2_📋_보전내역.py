@@ -1,12 +1,13 @@
 import streamlit as st
 import sys, os
+import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import (
     get_maintenance, insert_maintenance, update_maintenance, delete_maintenance,
     get_equipment, get_issue_code_options, get_issue_codes, get_available_years, init_db
 )
 from utils.constants import FACTORIES, MAINTENANCE_STATUS_LIST as STATUS_LIST, SHIFT_LIST, RECV_TYPE_LIST, CONTRACTOR_LIST
-from utils.style import inject_css, page_header, kpi_cards
+from utils.style import inject_css, page_header, kpi_cards, status_badge
 import pandas as pd
 from datetime import datetime, date
 
@@ -109,37 +110,43 @@ with tab1:
     if df.empty:
         st.info("조회된 데이터가 없습니다.")
     else:
-        # 표시용 컬럼 선택
-        display_cols = ["id", "factory", "equipment_code", "equipment_name",
-                        "issue_code", "recv_date", "comp_date", "downtime_min",
-                        "status", "assignee", "issue_desc"]
-        display_cols = [c for c in display_cols if c in df.columns]
-        df_show = df[display_cols].copy()
-        df_show.columns = ["ID", "팩토리", "설비코드", "설비명", "이슈코드",
-                           "발생일자", "조치일자", "고장시간(분)", "상태", "담당자", "이상내용"][:len(display_cols)]
+        df = df.reset_index(drop=True)
 
-        # 순번 앞에 추가, ID 컬럼은 숨김
-        df_show.insert(0, "순번", range(1, len(df_show) + 1))
-        df_display = df_show.drop(columns=["ID"])
+        _BORDER = {"완료": "#2FA37A", "진행 중": "#C98A18", "팬딩": "#9C978C",
+                   "고장": "#D6485B", "취소": "#9C978C"}
+        cards = '<div class="rec-scroll">'
+        for i, row in df.iterrows():
+            seq = i + 1
+            status = str(row.get("status") or "")
+            color = _BORDER.get(status, "#6E62E6")
+            name = html.escape(str(row.get("equipment_name") or "-"))
+            code = html.escape(str(row.get("equipment_code") or ""))
+            fac = html.escape(str(row.get("factory") or ""))
+            issue = html.escape(str(row.get("issue_code") or "-"))
+            recv = html.escape(str(row.get("recv_date") or "-"))
+            comp = html.escape(str(row.get("comp_date") or ""))
+            down = row.get("downtime_min") or 0
+            assignee = html.escape(str(row.get("assignee") or ""))
+            desc = html.escape(str(row.get("issue_desc") or "").strip())
 
-        # 상태 색상 표시
-        def status_badge(s):
-            if s == "완료":
-                return "✅ 완료"
-            elif s == "진행 중":
-                return "🔄 진행 중"
-            elif s == "팬딩":
-                return "⏸ 팬딩"
-            return s
-
-        df_display["상태"] = df_display["상태"].apply(status_badge)
-
-        st.dataframe(
-            df_display,
-            use_container_width=True,
-            height=min(len(df_display) * 36 + 42, 430),
-            hide_index=True,
-        )
+            meta = f'<span>🏷️ <b>{issue}</b></span><span>📅 발생 {recv}</span>'
+            if comp:
+                meta += f'<span>✅ 조치 {comp}</span>'
+            if down:
+                meta += f'<span>⏱️ <b>{int(down)}</b>분</span>'
+            if assignee:
+                meta += f'<span>👤 {assignee}</span>'
+            desc_html = f'<div class="rec-desc">{desc}</div>' if desc else ''
+            cards += (
+                f'<div class="rec-card" style="border-left-color:{color}">'
+                f'<div class="rec-top"><span class="rec-seq">#{seq}</span>'
+                f'<span class="rec-name">{name}</span><span class="rec-sub">{code}</span>'
+                f'{status_badge(status)}<span class="rec-spacer"></span>'
+                f'<span class="rec-fac">{fac}</span></div>'
+                f'<div class="rec-meta">{meta}</div>{desc_html}</div>'
+            )
+        cards += '</div>'
+        st.markdown(cards, unsafe_allow_html=True)
 
         # 다운로드
         csv = df.to_csv(index=False, encoding="utf-8-sig")
@@ -154,16 +161,12 @@ with tab1:
         st.markdown("##### ✏️ 수정 / 삭제")
         esc1, esc2 = st.columns([1, 3])
         with esc1:
-            edit_seq = st.number_input("순번 선택", min_value=1, max_value=len(df_show), step=1, key="edit_id")
+            edit_seq = st.number_input("순번 선택", min_value=1, max_value=len(df), step=1, key="edit_id")
         with esc2:
             st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
             if st.button("✏️ 선택 항목 수정 / 삭제 열기", type="primary"):
-                actual_id = int(df_show[df_show["순번"] == edit_seq]["ID"].values[0]) if edit_seq <= len(df_show) else None
-                row_data = df[df["id"] == actual_id] if actual_id else pd.DataFrame()
-                if row_data.empty:
-                    st.warning("해당 순번이 없습니다.")
-                else:
-                    maintenance_edit_dialog(row_data.iloc[0], actual_id)
+                row = df.iloc[int(edit_seq) - 1]
+                maintenance_edit_dialog(row, int(row["id"]))
 
 # ══════════════════════════════
 # 탭2: 신규 등록
