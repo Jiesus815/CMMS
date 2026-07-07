@@ -57,7 +57,7 @@ with tab1:
         })
         st.dataframe(
             df_show[["작업일자", "작성자", "팩토리", "구분", "제목", "내용"]],
-            use_container_width=True, height=420, hide_index=True,
+            use_container_width=True, height=min(len(df_show) * 36 + 42, 430), hide_index=True,
         )
 
         csv = df_show.to_csv(index=False, encoding="utf-8-sig")

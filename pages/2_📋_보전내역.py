@@ -137,7 +137,7 @@ with tab1:
         st.dataframe(
             df_display,
             use_container_width=True,
-            height=420,
+            height=min(len(df_display) * 36 + 42, 430),
             hide_index=True,
         )
 

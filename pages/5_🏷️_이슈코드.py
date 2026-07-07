@@ -32,7 +32,7 @@ with tab1:
         "part_code": "부품코드", "issue_name": "이슈명", "issue_name_en": "이슈명(영문)",
         "issue_code": "이슈코드", "full_code": "통합코드",
     })
-    st.dataframe(df_show, use_container_width=True, height=480, hide_index=True)
+    st.dataframe(df_show, use_container_width=True, height=min(len(df_show) * 36 + 42, 520), hide_index=True)
 
     # 부품코드 요약
     st.markdown("---")

@@ -71,7 +71,7 @@ else:
     st.dataframe(
         df_display,
         use_container_width=True,
-        height=520,
+        height=min(len(df_display) * 36 + 42, 560),
         hide_index=True,
     )
 
