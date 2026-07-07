@@ -16,6 +16,55 @@ inject_css()
 
 page_header("📋 보전내역 관리", "보전 작업 등록 · 조회 · 수정 · 삭제")
 
+
+@st.dialog("보전내역 수정 · 삭제", width="large")
+def maintenance_edit_dialog(row, edit_id):
+    st.caption(f"ID {edit_id} · {row['equipment_code'] or '-'} · {row['equipment_name'] or ''}")
+    ec1, ec2, ec3 = st.columns(3)
+    with ec1:
+        e_factory = st.selectbox("팩토리", FACTORIES,
+            index=FACTORIES.index(row["factory"]) if row["factory"] in FACTORIES else 0)
+        e_shift = st.selectbox("Shift", SHIFT_LIST,
+            index=SHIFT_LIST.index(row["shift"]) if row["shift"] in SHIFT_LIST else 0)
+        e_status = st.selectbox("진행상태", STATUS_LIST,
+            index=STATUS_LIST.index(row["status"]) if row["status"] in STATUS_LIST else 0)
+    with ec2:
+        e_eq_code = st.text_input("설비코드", value=row["equipment_code"] or "")
+        e_eq_name = st.text_input("설비명", value=row["equipment_name"] or "")
+        issue_opts = get_issue_code_options()
+        e_issue = st.selectbox("이슈코드", [""] + issue_opts,
+            index=([""] + issue_opts).index(row["issue_code"]) if row["issue_code"] in issue_opts else 0)
+    with ec3:
+        e_comp_date = st.date_input("조치일자",
+            value=pd.to_datetime(row["comp_date"]).date() if row["comp_date"] else date.today())
+        e_downtime = st.number_input("고장시간(분)", value=int(row["downtime_min"] or 0), min_value=0)
+        e_assignee = st.text_input("담당자", value=row["assignee"] or "")
+
+    e_issue_desc = st.text_area("이상 접수 내용", value=row["issue_desc"] or "", height=80)
+    e_root_cause = st.text_area("발생원인", value=row["root_cause"] or "", height=80)
+    e_slack = st.text_input("슬랙 링크", value=row["slack_link"] or "")
+
+    sb1, sb2 = st.columns(2)
+    with sb1:
+        if st.button("💾 저장", use_container_width=True, type="primary"):
+            update_maintenance(edit_id, {
+                "factory": e_factory, "shift": e_shift, "status": e_status,
+                "equipment_code": e_eq_code, "equipment_name": e_eq_name,
+                "issue_code": e_issue,
+                "comp_date": str(e_comp_date),
+                "downtime_min": e_downtime, "assignee": e_assignee,
+                "issue_desc": e_issue_desc, "root_cause": e_root_cause,
+                "slack_link": e_slack,
+            })
+            st.cache_data.clear()
+            st.rerun()
+    with sb2:
+        if st.button("🗑️ 삭제", use_container_width=True):
+            delete_maintenance(edit_id)
+            st.cache_data.clear()
+            st.rerun()
+
+
 # ─── 탭 ───
 tab1, tab2 = st.tabs(["📋 목록 조회", "➕ 신규 등록"])
 
@@ -102,66 +151,19 @@ with tab1:
         )
 
         st.markdown("---")
-        st.subheader("✏️ 수정 / 삭제")
-        edit_seq = st.number_input("순번 입력", min_value=1, max_value=len(df_show), step=1, key="edit_id")
-
-        if edit_seq:
-            # 순번 → 실제 DB ID 변환
-            actual_id = int(df_show[df_show["순번"] == edit_seq]["ID"].values[0]) if edit_seq <= len(df_show) else None
-            row_data = df[df["id"] == actual_id] if actual_id else pd.DataFrame()
-            if row_data.empty:
-                st.warning("해당 순번이 없습니다.")
-            else:
-                edit_id = actual_id
-                row = row_data.iloc[0]
-                with st.form("edit_form"):
-                    ec1, ec2, ec3 = st.columns(3)
-                    with ec1:
-                        e_factory = st.selectbox("팩토리", FACTORIES,
-                            index=FACTORIES.index(row["factory"]) if row["factory"] in FACTORIES else 0)
-                        e_shift = st.selectbox("Shift", SHIFT_LIST,
-                            index=SHIFT_LIST.index(row["shift"]) if row["shift"] in SHIFT_LIST else 0)
-                        e_status = st.selectbox("진행상태", STATUS_LIST,
-                            index=STATUS_LIST.index(row["status"]) if row["status"] in STATUS_LIST else 0)
-                    with ec2:
-                        e_eq_code = st.text_input("설비코드", value=row["equipment_code"] or "")
-                        e_eq_name = st.text_input("설비명", value=row["equipment_name"] or "")
-                        issue_opts = get_issue_code_options()
-                        e_issue = st.selectbox("이슈코드", [""] + issue_opts,
-                            index=([""] + issue_opts).index(row["issue_code"]) if row["issue_code"] in issue_opts else 0)
-                    with ec3:
-                        e_comp_date = st.date_input("조치일자",
-                            value=pd.to_datetime(row["comp_date"]).date() if row["comp_date"] else date.today())
-                        e_downtime = st.number_input("고장시간(분)", value=int(row["downtime_min"] or 0), min_value=0)
-                        e_assignee = st.text_input("담당자", value=row["assignee"] or "")
-
-                    e_issue_desc = st.text_area("이상 접수 내용", value=row["issue_desc"] or "", height=80)
-                    e_root_cause = st.text_area("발생원인", value=row["root_cause"] or "", height=80)
-                    e_slack = st.text_input("슬랙 링크", value=row["slack_link"] or "")
-
-                    sb1, sb2 = st.columns(2)
-                    with sb1:
-                        submitted_edit = st.form_submit_button("💾 저장", use_container_width=True)
-                    with sb2:
-                        submitted_del = st.form_submit_button("🗑️ 삭제", use_container_width=True, type="secondary")
-
-                if submitted_edit:
-                    update_maintenance(edit_id, {
-                        "factory": e_factory, "shift": e_shift, "status": e_status,
-                        "equipment_code": e_eq_code, "equipment_name": e_eq_name,
-                        "issue_code": e_issue,
-                        "comp_date": str(e_comp_date),
-                        "downtime_min": e_downtime, "assignee": e_assignee,
-                        "issue_desc": e_issue_desc, "root_cause": e_root_cause,
-                        "slack_link": e_slack,
-                    })
-                    st.success(f"ID {edit_id} 수정 완료!")
-                    st.rerun()
-
-                if submitted_del:
-                    delete_maintenance(edit_id)
-                    st.success(f"ID {edit_id} 삭제 완료!")
-                    st.rerun()
+        st.markdown("##### ✏️ 수정 / 삭제")
+        esc1, esc2 = st.columns([1, 3])
+        with esc1:
+            edit_seq = st.number_input("순번 선택", min_value=1, max_value=len(df_show), step=1, key="edit_id")
+        with esc2:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("✏️ 선택 항목 수정 / 삭제 열기", type="primary"):
+                actual_id = int(df_show[df_show["순번"] == edit_seq]["ID"].values[0]) if edit_seq <= len(df_show) else None
+                row_data = df[df["id"] == actual_id] if actual_id else pd.DataFrame()
+                if row_data.empty:
+                    st.warning("해당 순번이 없습니다.")
+                else:
+                    maintenance_edit_dialog(row_data.iloc[0], actual_id)
 
 # ══════════════════════════════
 # 탭2: 신규 등록

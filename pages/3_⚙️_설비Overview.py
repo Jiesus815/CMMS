@@ -14,6 +14,41 @@ inject_css()
 
 page_header("⚙️ 설비 Overview", "설비 상태 현황 · 등록 · 수정")
 
+
+@st.dialog("설비 수정 · 삭제", width="large")
+def equipment_edit_dialog(row):
+    st.caption(f"{row['equipment_code']} · {row['equipment_name']} ({row['factory']})")
+    ec1, ec2 = st.columns(2)
+    with ec1:
+        e_fac = st.selectbox("팩토리", FACTORIES,
+            index=FACTORIES.index(row["factory"]) if row["factory"] in FACTORIES else 0)
+        e_code = st.text_input("설비코드", value=row["equipment_code"])
+        e_name = st.text_input("설비명", value=row["equipment_name"])
+        e_cat = st.selectbox("분류", CATEGORY_LIST,
+            index=CATEGORY_LIST.index(row["category"]) if row.get("category") in CATEGORY_LIST else 0)
+    with ec2:
+        e_loc = st.text_input("위치", value=row.get("location") or "")
+        e_st = st.selectbox("상태", STATUS_LIST,
+            index=STATUS_LIST.index(row["status"]) if row["status"] in STATUS_LIST else 0)
+        e_install = st.text_input("설치일 (YYYY-MM-DD)", value=row.get("install_date") or "")
+        e_memo = st.text_area("비고", value=row.get("memo") or "", height=80)
+    sb1, sb2 = st.columns(2)
+    with sb1:
+        if st.button("💾 저장", use_container_width=True, type="primary"):
+            upsert_equipment({
+                "id": int(row["id"]), "factory": e_fac, "equipment_code": e_code,
+                "equipment_name": e_name, "category": e_cat, "location": e_loc,
+                "status": e_st, "install_date": e_install, "memo": e_memo,
+            })
+            st.cache_data.clear()
+            st.rerun()
+    with sb2:
+        if st.button("🗑️ 삭제", use_container_width=True):
+            delete_equipment(int(row["id"]))
+            st.cache_data.clear()
+            st.rerun()
+
+
 tab1, tab2 = st.tabs(["📋 설비 목록", "➕ 설비 등록"])
 
 # ══════════════════════════════
@@ -80,49 +115,18 @@ with tab1:
                            file_name=f"설비목록_{date.today()}.csv", mime="text/csv")
 
         st.markdown("---")
-        st.subheader("✏️ 수정 / 삭제")
-        st.caption("설비코드를 직접 입력하여 수정/삭제합니다.")
-        edit_code = st.text_input("설비코드 입력", placeholder="예: MO-0100-06")
-        if edit_code:
-            row_data = df_all[df_all["equipment_code"] == edit_code.strip()]
-            if row_data.empty:
-                st.warning("해당 설비코드가 없습니다.")
-            else:
-                row = row_data.iloc[0]
-                st.info(f"**{row['equipment_code']}** · {row['equipment_name']} ({row['factory']})")
-                with st.form("eq_edit"):
-                    ec1, ec2 = st.columns(2)
-                    with ec1:
-                        e_fac = st.selectbox("팩토리", FACTORIES, key="eq_edit_fac",
-                            index=FACTORIES.index(row["factory"]) if row["factory"] in FACTORIES else 0)
-                        e_code = st.text_input("설비코드", value=row["equipment_code"])
-                        e_name = st.text_input("설비명", value=row["equipment_name"])
-                        e_cat = st.selectbox("분류", CATEGORY_LIST, key="eq_edit_cat",
-                            index=CATEGORY_LIST.index(row["category"]) if row.get("category") in CATEGORY_LIST else 0)
-                    with ec2:
-                        e_loc = st.text_input("위치", value=row.get("location") or "")
-                        e_st = st.selectbox("상태", STATUS_LIST, key="eq_edit_st",
-                            index=STATUS_LIST.index(row["status"]) if row["status"] in STATUS_LIST else 0)
-                        e_install = st.text_input("설치일 (YYYY-MM-DD)", value=row.get("install_date") or "")
-                        e_memo = st.text_area("비고", value=row.get("memo") or "", height=80)
-                    sb1, sb2 = st.columns(2)
-                    with sb1:
-                        s_edit = st.form_submit_button("💾 저장", use_container_width=True)
-                    with sb2:
-                        s_del = st.form_submit_button("🗑️ 삭제", use_container_width=True)
-
-                if s_edit:
-                    upsert_equipment({
-                        "id": int(row["id"]), "factory": e_fac, "equipment_code": e_code,
-                        "equipment_name": e_name, "category": e_cat, "location": e_loc,
-                        "status": e_st, "install_date": e_install, "memo": e_memo,
-                    })
-                    st.success("수정 완료!")
-                    st.rerun()
-                if s_del:
-                    delete_equipment(int(row["id"]))
-                    st.success("삭제 완료!")
-                    st.rerun()
+        st.markdown("##### ✏️ 수정 / 삭제")
+        esc1, esc2 = st.columns([1, 3])
+        with esc1:
+            edit_code = st.text_input("설비코드 입력", placeholder="예: MO-0100-06")
+        with esc2:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            if st.button("✏️ 수정 / 삭제 열기", type="primary"):
+                row_data = df_all[df_all["equipment_code"] == edit_code.strip()] if edit_code.strip() else pd.DataFrame()
+                if row_data.empty:
+                    st.warning("설비코드를 정확히 입력하세요.")
+                else:
+                    equipment_edit_dialog(row_data.iloc[0])
 
 # ══════════════════════════════
 # 탭2: 설비 등록
