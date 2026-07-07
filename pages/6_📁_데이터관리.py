@@ -52,6 +52,8 @@ with tab1:
 
             os.remove(tmp_path)
 
+            st.cache_data.clear()
+
             if results["errors"]:
                 st.warning(f"⚠️ 일부 오류 발생 ({len(results['errors'])}건)")
                 with st.expander("오류 내역 보기"):

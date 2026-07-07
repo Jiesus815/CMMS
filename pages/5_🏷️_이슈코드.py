@@ -67,6 +67,7 @@ with tab2:
             full = f"{n_part_code}-{n_issue_code}"
             try:
                 if add_issue_code(n_part_name, n_part_en, n_part_code, n_issue_name, n_issue_en, n_issue_code):
+                    st.cache_data.clear()
                     st.success(f"✅ '{full}' 코드가 추가되었습니다!")
                 else:
                     st.warning(f"⚠️ '{full}' 코드는 이미 존재합니다.")

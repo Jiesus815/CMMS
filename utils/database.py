@@ -172,6 +172,20 @@ def init_db():
         )
     """)
 
+    # 작업일지 (작성자가 수기로 기입하는 일지)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS work_log (
+            id SERIAL PRIMARY KEY,
+            log_date TEXT NOT NULL,
+            author TEXT,
+            factory TEXT,
+            category TEXT,
+            title TEXT,
+            content TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     conn.commit()
     _seed_issue_codes(c, conn)
     _seed_holidays_2026(c, conn)
@@ -465,11 +479,13 @@ def delete_maintenance(m_id: int):
 
 
 # ─────────── 이슈코드 조회 ───────────
+@st.cache_data(ttl=600)
 def get_issue_codes():
     with db_connection() as conn:
         return pd.read_sql_query("SELECT DISTINCT full_code, part_name, issue_name FROM issue_code ORDER BY full_code", conn)
 
 
+@st.cache_data(ttl=600)
 def get_issue_code_full():
     """이슈코드 전체 상세(부품/이슈 영문 포함) 목록."""
     with db_connection() as conn:
@@ -480,6 +496,7 @@ def get_issue_code_full():
         )
 
 
+@st.cache_data(ttl=600)
 def get_part_codes():
     """부품코드 distinct 목록."""
     with db_connection() as conn:
@@ -507,6 +524,7 @@ def get_issue_code_options():
 
 
 # ─────────── 통계 쿼리 ───────────
+@st.cache_data(ttl=300)
 def get_available_years():
     """maintenance에 존재하는 접수 연도 목록(내림차순). 없으면 올해 연도 1개."""
     from datetime import datetime as _dt
@@ -860,3 +878,43 @@ def clear_all_data():
         c.execute("DELETE FROM slack_sync_state")
         c.execute("DELETE FROM maintenance")
         c.execute("DELETE FROM equipment")
+
+
+# ─────────── 작업일지 CRUD ───────────
+def add_work_log(data: dict):
+    """작업일지 기록 추가."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("""
+            INSERT INTO work_log (log_date, author, factory, category, title, content)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """, (
+            data.get("log_date"), data.get("author"), data.get("factory"),
+            data.get("category"), data.get("title"), data.get("content"),
+        ))
+
+
+def get_work_logs(year=None, month=None, author=None, factory=None):
+    """작업일지 조회. 컬럼은 ASCII로 반환."""
+    q = "SELECT id, log_date, author, factory, category, title, content FROM work_log WHERE 1=1"
+    params = []
+    if year:
+        q += " AND log_date LIKE %s"
+        params.append(f"{int(year):04d}-%")
+    if month:
+        q += " AND log_date LIKE %s"
+        params.append(f"%-{int(month):02d}-%")
+    if author:
+        q += " AND author ILIKE %s"
+        params.append(f"%{author}%")
+    if factory:
+        q += " AND factory=%s"
+        params.append(factory)
+    q += " ORDER BY log_date DESC, id DESC LIMIT 1000"
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=params if params else None)
+
+
+def delete_work_log(log_id: int):
+    """작업일지 삭제."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM work_log WHERE id=%s", (log_id,))

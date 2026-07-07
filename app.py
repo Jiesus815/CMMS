@@ -27,6 +27,7 @@ nav = {
         st.Page(os.path.join(_PAGES, "2_📋_보전내역.py"), title="보전내역", icon="📋"),
         st.Page(os.path.join(_PAGES, "4_📅_주차별현황.py"), title="주차별 현황", icon="📅"),
         st.Page(os.path.join(_PAGES, "3_⚙️_설비Overview.py"), title="설비 현황", icon="🏭"),
+        st.Page(os.path.join(_PAGES, "8_📝_작업일지.py"), title="작업일지", icon="📝"),
     ],
     "데이터 관리": [
         st.Page(os.path.join(_PAGES, "5_🏷️_이슈코드.py"), title="이슈코드", icon="🏷️"),

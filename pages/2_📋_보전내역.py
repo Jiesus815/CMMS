@@ -292,5 +292,6 @@ with tab2:
                 "root_cause": n_root_cause, "slack_link": n_slack,
             })
             st.success("✅ 보전 작업이 등록되었습니다!")
+            st.cache_data.clear()
             st.balloons()
 
