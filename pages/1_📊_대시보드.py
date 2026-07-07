@@ -3,7 +3,7 @@ import sys, os
 import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, get_available_years, init_db
-from utils.style import inject_css, page_header, kpi_cards, style_plotly, IRIS, GOLD, CHART_SEQ, CHART_GRAD
+from utils.style import inject_css, page_header, kpi_cards, chart_title, style_plotly, IRIS, GOLD, CHART_SEQ, CHART_GRAD
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -35,105 +35,113 @@ kpi_cards([
     {"label": "평균 고장시간","value": f"{kpi['avg_down']}분", "icon": "⏱️", "color": "red",    "sub": "분 단위"},
 ])
 
-st.markdown("---")
+st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-# ─── 차트 Row 1 ───
-chart_col1, chart_col2 = st.columns([3, 2])
+# ═══════════════ 차트 Row 1 ═══════════════
+chart_col1, chart_col2 = st.columns([1.5, 1], gap="medium")
 
 with chart_col1:
-    st.subheader("📅 월별 보전 인입 건수")
-    df_monthly = get_monthly_count(year_sel)
-    if not df_monthly.empty:
-        months_all = pd.DataFrame({"월": range(1, 13)})
-        df_monthly = months_all.merge(df_monthly, on="월", how="left").fillna(0)
-        df_monthly["월명"] = df_monthly["월"].apply(lambda x: f"{int(x)}월")
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=df_monthly["월명"], y=df_monthly["건수"],
-            marker_color=IRIS, marker_line_width=0, name="보전건수",
-            text=df_monthly["건수"].astype(int),
-            textposition="outside", textfont=dict(color="#6A655C", size=11),
-            width=0.62,
-        ))
-        fig.add_trace(go.Scatter(
-            x=df_monthly["월명"], y=df_monthly["건수"],
-            mode="lines+markers", line=dict(color=GOLD, width=2.5, shape="spline"),
-            marker=dict(size=7, color=GOLD, line=dict(color="white", width=1.5)), name="추세",
-        ))
-        style_plotly(fig, height=320, showlegend=True)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("데이터가 없습니다.")
+    with st.container(border=True):
+        chart_title("월별 보전 인입 추세", f"{year_sel}년 · 월별 접수 건수와 추세선")
+        df_monthly = get_monthly_count(year_sel)
+        if not df_monthly.empty:
+            # 한글 컬럼명 정규화 이슈 회피: 위치 기반 ASCII 컬럼으로 통일
+            df_monthly.columns = ["month", "count"]
+            months_all = pd.DataFrame({"month": range(1, 13)})
+            df_monthly = months_all.merge(df_monthly, on="month", how="left").fillna(0)
+            df_monthly["label"] = df_monthly["month"].apply(lambda x: f"{int(x)}월")
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=df_monthly["label"], y=df_monthly["count"],
+                marker=dict(color=IRIS, line_width=0), name="건수",
+                text=df_monthly["count"].astype(int),
+                textposition="outside", textfont=dict(color="#9C978C", size=10),
+                width=0.6, hovertemplate="%{x} · %{y}건<extra></extra>",
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_monthly["label"], y=df_monthly["count"],
+                mode="lines", line=dict(color=GOLD, width=2.5, shape="spline"),
+                name="추세", hoverinfo="skip",
+            ))
+            style_plotly(fig, height=250, showlegend=False)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.info("데이터가 없습니다.")
 
 with chart_col2:
-    st.subheader("🏭 팩토리별 건수")
-    df_fac = get_factory_count(year_sel)
-    if not df_fac.empty:
-        fig2 = px.pie(
-            df_fac, names="팭토리", values="건수",
-            color_discrete_sequence=CHART_SEQ,
-            hole=0.55,
-        )
-        fig2.update_traces(
-            textposition="outside", textinfo="label+percent",
-            marker=dict(line=dict(color="white", width=2)),
-        )
-        style_plotly(fig2, height=320)
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.info("데이터가 없습니다.")
+    with st.container(border=True):
+        chart_title("팩토리 분포", "팩토리별 보전 비중")
+        df_fac = get_factory_count(year_sel)
+        if not df_fac.empty:
+            df_fac.columns = ["factory", "count"]
+            total_fac = int(df_fac["count"].sum())
+            fig2 = go.Figure(go.Pie(
+                labels=df_fac["factory"], values=df_fac["count"],
+                hole=0.62, sort=False,
+                marker=dict(colors=CHART_SEQ, line=dict(color="white", width=2)),
+                textinfo="percent", textfont=dict(size=11, color="white"),
+                hovertemplate="%{label} · %{value}건 (%{percent})<extra></extra>",
+            ))
+            fig2.update_layout(
+                annotations=[dict(text=f"<b>{total_fac}</b><br>총 건수", x=0.5, y=0.5,
+                                  font=dict(size=15, color="#1A1814"), showarrow=False)],
+            )
+            style_plotly(fig2, height=250, showlegend=True)
+            fig2.update_layout(legend=dict(orientation="v", x=1, y=0.5, font=dict(size=10)))
+            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.info("데이터가 없습니다.")
 
-# ─── 차트 Row 2 ───
-chart_col3, chart_col4 = st.columns([3, 2])
+# ═══════════════ 차트 Row 2 ═══════════════
+chart_col3, chart_col4 = st.columns([1.5, 1], gap="medium")
 
 with chart_col3:
-    st.subheader("🔩 이슈 유형 Top 15")
-    df_issue = get_issue_top(year_sel, 15)
-    if not df_issue.empty:
-        fig3 = px.bar(
-            df_issue.sort_values("건수"),
-            x="건수", y="이슈코드",
-            orientation="h",
-            color="건수",
-            color_continuous_scale=CHART_GRAD,
-            text="건수",
-        )
-        fig3.update_traces(textposition="outside", textfont=dict(color="#6A655C", size=11),
-                           marker_line_width=0)
-        style_plotly(fig3, height=380)
-        fig3.update_layout(coloraxis_showscale=False)
-        st.plotly_chart(fig3, use_container_width=True)
-    else:
-        st.info("데이터가 없습니다.")
+    with st.container(border=True):
+        chart_title("이슈 유형 Top 10", "가장 빈번한 이슈코드")
+        df_issue = get_issue_top(year_sel, 10)
+        if not df_issue.empty:
+            df_issue.columns = ["code", "count"]
+            df_issue = df_issue.sort_values("count")
+            fig3 = px.bar(
+                df_issue,
+                x="count", y="code",
+                orientation="h",
+                color="count",
+                color_continuous_scale=CHART_GRAD,
+                text="count",
+            )
+            fig3.update_traces(textposition="outside", textfont=dict(color="#9C978C", size=10),
+                               marker_line_width=0, hovertemplate="%{y} · %{x}건<extra></extra>")
+            style_plotly(fig3, height=260)
+            fig3.update_layout(coloraxis_showscale=False, yaxis_title=None, xaxis_title=None)
+            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.info("데이터가 없습니다.")
 
 with chart_col4:
-    st.subheader("🚨 미완료 장기 건 (30일+)")
-    df_over = get_overdue(30)
-    if not df_over.empty:
-        for _, row in df_over.iterrows():
-            days = int(row["경과일수"])
-            color = "#D6485B" if days >= 60 else "#C98A18"
-            fac_txt = html.escape(str(row['factory']))
-            code_txt = html.escape(str(row['equipment_code']))
-            desc_txt = html.escape(str(row['issue_desc'])[:30]) if row['issue_desc'] else '내용 없음'
-            status_txt = html.escape(str(row['status']))
-            st.markdown(f"""
-            <div style="background:white;border-left:3px solid {color};
-                padding:11px 15px;border-radius:0 12px 12px 0;margin:7px 0;
-                border:1px solid #EAE7E0;box-shadow:0 1px 2px rgba(26,24,20,.05);">
-                <div style="font-weight:700;font-size:0.9rem;color:#1A1814;letter-spacing:-.01em;">
-                    {fac_txt} · {code_txt}
-                </div>
-                <div style="font-size:0.82rem;color:#6A655C;margin-top:3px;">
-                    {desc_txt}
-                </div>
-                <div style="font-size:0.78rem;color:{color};font-weight:700;margin-top:5px;">
-                    ⏰ {days}일 경과 · {status_txt}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.success("✅ 30일 이상 미완료 건이 없습니다!")
+    with st.container(border=True):
+        chart_title("장기 미완료", "30일 이상 경과 건")
+        df_over = get_overdue(30)
+        if not df_over.empty:
+            cards_html = '<div style="max-height:212px;overflow-y:auto;padding-right:4px;">'
+            for _, row in df_over.iterrows():
+                days = int(row["경과일수"])
+                color = "#D6485B" if days >= 60 else "#C98A18"
+                fac_txt = html.escape(str(row['factory']))
+                code_txt = html.escape(str(row['equipment_code']))
+                desc_txt = html.escape(str(row['issue_desc'])[:28]) if row['issue_desc'] else '내용 없음'
+                cards_html += f"""
+                <div style="background:rgba(255,255,255,.7);border-left:3px solid {color};
+                    padding:8px 12px;border-radius:0 10px 10px 0;margin:0 0 7px;
+                    border:1px solid #EAE7E0;">
+                    <div style="font-weight:700;font-size:0.82rem;color:#1A1814;">{fac_txt} · {code_txt}</div>
+                    <div style="font-size:0.74rem;color:#6A655C;margin-top:2px;">{desc_txt}</div>
+                    <div style="font-size:0.72rem;color:{color};font-weight:700;margin-top:3px;">⏰ {days}일 경과</div>
+                </div>"""
+            cards_html += "</div>"
+            st.markdown(cards_html, unsafe_allow_html=True)
+        else:
+            st.success("✅ 30일 이상 미완료 건 없음")
 
-st.markdown("---")
+st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")

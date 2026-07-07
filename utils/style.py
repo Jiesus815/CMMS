@@ -145,6 +145,24 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
     padding: 22px 24px; margin-bottom: 16px; box-shadow: var(--sh-sm);
 }
 
+/* ── st.container(border=True) 프리미엄 카드화 ── */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.7));
+    border: 1px solid var(--border) !important; border-radius: var(--r-lg) !important;
+    padding: 16px 18px !important; box-shadow: var(--sh-sm);
+    backdrop-filter: blur(6px);
+    transition: box-shadow .28s var(--ease), transform .28s var(--ease);
+}
+[data-testid="stVerticalBlockBorderWrapper"]:hover { box-shadow: var(--sh-md); }
+
+/* ── 차트 카드 타이틀 ── */
+.chart-title {
+    font-family:'Instrument Serif','Noto Sans KR',serif; font-size:1.2rem; font-weight:400;
+    color: var(--tx1); margin:0 0 1px; display:flex; align-items:center; gap:9px; letter-spacing:-.01em;
+}
+.chart-title .ct-dot { width:8px; height:8px; border-radius:50%; background: linear-gradient(145deg,var(--iris),var(--gold)); box-shadow:0 0 0 3px rgba(110,98,230,.14); flex-shrink:0; }
+.chart-cap { font-size:.72rem; color: var(--tx3); margin:0 0 10px 17px; font-weight:500; }
+
 /* ── st.metric ── */
 [data-testid="stMetric"] {
     background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
@@ -322,6 +340,15 @@ def status_badge(status: str) -> str:
     """상태 문자열 → HTML 배지 반환"""
     bc = _STATUS_BADGE.get(status, "badge-pend")
     return f'<span class="badge {bc}"><span class="led"></span>{status}</span>'
+
+
+def chart_title(title: str, caption: str = "") -> None:
+    """차트 카드용 컴팩트 타이틀(+선택 캡션) 렌더링."""
+    st.markdown(
+        f'<div class="chart-title"><span class="ct-dot"></span>{title}</div>'
+        + (f'<div class="chart-cap">{caption}</div>' if caption else ''),
+        unsafe_allow_html=True,
+    )
 
 
 # ─── 차트 색상 팔레트 (Atelier 아이리스/골드) ────────────────────
