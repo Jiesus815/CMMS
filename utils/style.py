@@ -183,6 +183,22 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .rec-meta b { color:var(--tx1); font-weight:600; font-variant-numeric:tabular-nums; }
 .rec-desc { margin-top:8px; font-size:.82rem; color:var(--tx2); line-height:1.5; border-top:1px dashed var(--border); padding-top:7px; }
 
+/* ── 카드 그리드 (설비 등 다수 항목) ── */
+.rec-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:10px; margin-top:4px; }
+.eq-card {
+    background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.78));
+    border:1px solid var(--border); border-left:3px solid var(--iris);
+    border-radius: var(--r-md); padding:12px 14px; box-shadow: var(--sh-sm);
+    transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+}
+.eq-card:hover { transform: translateY(-3px); box-shadow: var(--sh-md); }
+.eq-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.eq-name { font-weight:700; font-size:.9rem; color:var(--tx1); letter-spacing:-.01em; }
+.eq-code { font-size:.74rem; color:var(--tx3); font-weight:600; margin-top:1px; }
+.eq-meta { font-size:.75rem; color:var(--tx2); margin-top:7px; }
+.eq-st { display:inline-flex; align-items:center; gap:5px; font-size:.72rem; font-weight:700; white-space:nowrap; }
+.eq-st .d { width:7px; height:7px; border-radius:50%; }
+
 /* ── st.metric ── */
 [data-testid="stMetric"] {
     background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);

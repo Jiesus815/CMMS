@@ -1,5 +1,6 @@
 import streamlit as st
 import sys, os
+import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import add_work_log, get_work_logs, delete_work_log, get_available_years, init_db
 from utils.constants import FACTORIES
@@ -55,10 +56,32 @@ with tab1:
             "id": "ID", "log_date": "작업일자", "author": "작성자", "factory": "팩토리",
             "category": "구분", "title": "제목", "content": "내용",
         })
-        st.dataframe(
-            df_show[["작업일자", "작성자", "팩토리", "구분", "제목", "내용"]],
-            use_container_width=True, height=min(len(df_show) * 36 + 42, 430), hide_index=True,
-        )
+
+        _CAT_COLOR = {"점검": "#6E62E6", "수리": "#C98A18", "교체": "#D6485B", "청소": "#2FA37A",
+                      "조정": "#9A7CF0", "개선": "#C9A24B", "기타": "#9C978C"}
+        cards = '<div class="rec-scroll">'
+        for _, r in df.iterrows():
+            title = html.escape(str(r.get("title") or "(제목 없음)"))
+            author = html.escape(str(r.get("author") or "-"))
+            fac = html.escape(str(r.get("factory") or ""))
+            cat = str(r.get("category") or "")
+            color = _CAT_COLOR.get(cat, "#6E62E6")
+            ldate = html.escape(str(r.get("log_date") or "-"))
+            content = html.escape(str(r.get("content") or "").strip())
+            meta = f'<span>📅 {ldate}</span><span>👤 {author}</span>'
+            if fac:
+                meta += f'<span>🏭 {fac}</span>'
+            cat_pill = f'<span class="rec-fac" style="color:{color};background:{color}1a">{html.escape(cat)}</span>' if cat else ''
+            cards += (
+                f'<div class="rec-card" style="border-left-color:{color}">'
+                f'<div class="rec-top"><span class="rec-name">{title}</span>'
+                f'<span class="rec-spacer"></span>{cat_pill}</div>'
+                f'<div class="rec-meta">{meta}</div>'
+                + (f'<div class="rec-desc">{content}</div>' if content else '')
+                + '</div>'
+            )
+        cards += '</div>'
+        st.markdown(cards, unsafe_allow_html=True)
 
         csv = df_show.to_csv(index=False, encoding="utf-8-sig")
         st.download_button(

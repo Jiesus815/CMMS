@@ -86,9 +86,8 @@ with tab1:
         factories_in_view = df["factory"].unique().tolist()
         factories_in_view.sort()
 
-        def eq_status_icon(s):
-            icons = {"정상": "🟢 정상", "점검중": "🟡 점검중", "팬딩": "🟠 팬딩", "고장": "🔴 고장", "폐기": "⚫ 폐기"}
-            return icons.get(s, s)
+        _EQ_COLOR = {"정상": "#2FA37A", "점검중": "#C98A18", "팬딩": "#9C978C",
+                     "고장": "#D6485B", "폐기": "#9C978C"}
 
         for fac in factories_in_view:
             df_fac = df[df["factory"] == fac].copy()
@@ -97,17 +96,34 @@ with tab1:
             pending = len(df_fac[df_fac["status"] == "팬딩"])
             broken = len(df_fac[df_fac["status"] == "고장"])
 
-            st.markdown(f"### 🏭 {html.escape(str(fac))}  <span style='font-size:0.9rem; color:#64748B;'>총 {len(df_fac)}대 &nbsp;·&nbsp; 🟢 {normal} &nbsp;🟡 {checking} &nbsp;🟠 {pending} &nbsp;🔴 {broken}</span>", unsafe_allow_html=True)
+            st.markdown(f"### 🏭 {html.escape(str(fac))}  <span style='font-size:0.9rem; color:#9C978C;'>총 {len(df_fac)}대 &nbsp;·&nbsp; 🟢 {normal} &nbsp;🟡 {checking} &nbsp;🟠 {pending} &nbsp;🔴 {broken}</span>", unsafe_allow_html=True)
 
-            display_cols = ["equipment_code", "equipment_name", "category", "location", "status", "memo"]
-            display_cols = [c for c in display_cols if c in df_fac.columns]
-            df_show = df_fac[display_cols].copy()
-            df_show.columns = ["설비코드", "설비명", "분류", "위치", "상태", "비고"][:len(display_cols)]
-            df_show["상태"] = df_show["상태"].apply(eq_status_icon)
-
-            # 상태별 색상 강조: 점검중/고장 행 위에 배지
-            st.dataframe(df_show, use_container_width=True,
-                         height=min(80 + len(df_show) * 35, 400), hide_index=True)
+            grid = '<div class="rec-grid">'
+            for _, e in df_fac.iterrows():
+                stt = str(e.get("status") or "")
+                color = _EQ_COLOR.get(stt, "#6E62E6")
+                name = html.escape(str(e.get("equipment_name") or "-"))
+                code = html.escape(str(e.get("equipment_code") or ""))
+                cat = html.escape(str(e.get("category") or "")) if e.get("category") else ""
+                loc = html.escape(str(e.get("location") or "")) if e.get("location") else ""
+                memo = html.escape(str(e.get("memo") or "")) if e.get("memo") else ""
+                meta_bits = []
+                if cat:
+                    meta_bits.append(f"🏷️ {cat}")
+                if loc:
+                    meta_bits.append(f"📍 {loc}")
+                meta = " · ".join(meta_bits)
+                grid += (
+                    f'<div class="eq-card" style="border-left-color:{color}">'
+                    f'<div class="eq-top"><span class="eq-name">{name}</span>'
+                    f'<span class="eq-st" style="color:{color}"><span class="d" style="background:{color}"></span>{html.escape(stt)}</span></div>'
+                    f'<div class="eq-code">{code}</div>'
+                    + (f'<div class="eq-meta">{meta}</div>' if meta else '')
+                    + (f'<div class="eq-meta" style="color:var(--tx3)">📝 {memo}</div>' if memo else '')
+                    + '</div>'
+                )
+            grid += '</div>'
+            st.markdown(grid, unsafe_allow_html=True)
             st.markdown("")
 
         csv = df.to_csv(index=False, encoding="utf-8-sig")
