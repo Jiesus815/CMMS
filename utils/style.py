@@ -107,7 +107,7 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .dot-mute{ background: var(--tx3);  box-shadow:0 0 0 3px rgba(156,151,140,.16); }
 
 .kpi-ico { display:none; }  /* Atelier: 아이콘 대신 도트 사용 */
-.kpi-val { font-family:'Inter','Noto Sans KR',sans-serif; font-weight:800; font-size:34px; color: var(--tx1); line-height:1; letter-spacing:-.03em; margin-top:16px; font-variant-numeric: tabular-nums; }
+.kpi-val { font-family:'Inter','Noto Sans KR',sans-serif; font-weight:800; font-size:34px; color: var(--tx1); line-height:1; letter-spacing:-.03em; margin-top:16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .kpi-sub { font-size:.72rem; color: var(--tx3); margin-top:11px; font-weight:500; }
 
 /* ── 상태 배지 ── */
