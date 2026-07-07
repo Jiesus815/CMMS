@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from utils.constants import FACTORIES
+from utils.constants import (
+    FACTORIES,
+    SLACK_COMPLETION_KEYWORDS as COMPLETION_KEYWORDS,
+    SLACK_COMPLETION_REACTIONS as COMPLETION_REACTIONS,
+    SLACK_WORKFLOW_KEYWORDS as WORKFLOW_KEYWORDS,
+)
 from utils.database import (
     get_conn,
     upsert_slack_request,
@@ -26,20 +31,7 @@ from utils.database import (
 )
 
 # ─── 완료 판단 기준 ───────────────────────────────────────────────
-# 메시지 텍스트에 이 단어 중 하나라도 포함되면 완료
-COMPLETION_KEYWORDS = ["완료"]
-
-# 이 이모티콘(reaction name)이 달리면 완료
-COMPLETION_REACTIONS = {
-    "white_check_mark",   # ✅
-    "heavy_check_mark",   # ✔️
-    "done",
-    "완료",               # 커스텀 이모티콘
-    "check",
-}
-
-# 워크플로우 봇 메시지를 구분하는 키워드 (본문에 포함된 경우 워크플로우로 판단)
-WORKFLOW_KEYWORDS = ["팩토리", "설비명", "증상", "점검"]
+# 완료 키워드/이모티콘/워크플로우 키워드는 utils.constants 에서 중앙 관리
 
 
 # ─── 메시지 파싱 ─────────────────────────────────────────────────

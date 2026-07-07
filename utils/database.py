@@ -470,6 +470,37 @@ def get_issue_codes():
         return pd.read_sql_query("SELECT DISTINCT full_code, part_name, issue_name FROM issue_code ORDER BY full_code", conn)
 
 
+def get_issue_code_full():
+    """이슈코드 전체 상세(부품/이슈 영문 포함) 목록."""
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT id, part_name, part_name_en, part_code, issue_name, issue_name_en, issue_code, full_code "
+            "FROM issue_code ORDER BY part_code, issue_code",
+            conn,
+        )
+
+
+def get_part_codes():
+    """부품코드 distinct 목록."""
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT DISTINCT part_code, part_name, part_name_en FROM issue_code ORDER BY part_code",
+            conn,
+        )
+
+
+def add_issue_code(part_name, part_name_en, part_code, issue_name, issue_name_en, issue_code) -> bool:
+    """이슈코드 추가. 중복(full_code)이면 False, 신규 삽입이면 True."""
+    full = f"{part_code}-{issue_code}"
+    with db_cursor(commit=True) as (conn, c):
+        c.execute(
+            "INSERT INTO issue_code (part_name,part_name_en,part_code,issue_name,issue_name_en,issue_code,full_code) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (full_code) DO NOTHING",
+            (part_name, part_name_en, part_code, issue_name, issue_name_en, issue_code, full),
+        )
+        return c.rowcount > 0
+
+
 def get_issue_code_options():
     df = get_issue_codes()
     return df["full_code"].tolist()

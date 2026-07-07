@@ -3,7 +3,8 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_weekly_pivot, get_maintenance, get_available_years, init_db
 from utils.constants import FACTORIES
-from utils.style import inject_css, page_header, kpi_cards
+from utils.style import inject_css, page_header, kpi_cards, style_plotly, CHART_GRAD
+import plotly.express as px
 import pandas as pd
 from datetime import datetime
 
@@ -94,17 +95,13 @@ else:
     if not df_m.empty:
         top_eq = df_m.groupby("equipment_code").size().reset_index(name="건수")
         top_eq = top_eq.sort_values("건수", ascending=False).head(10)
-        import plotly.express as px
         fig = px.bar(
             top_eq, x="equipment_code", y="건수",
-            color="건수", color_continuous_scale=["#BFDBFE", "#2563EB"],
+            color="건수", color_continuous_scale=CHART_GRAD,
             text="건수",
         )
-        fig.update_traces(textposition="outside")
-        fig.update_layout(
-            height=300, plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=20, b=0),
-            coloraxis_showscale=False,
-            xaxis_title="설비코드", yaxis_title="건수",
-        )
+        fig.update_traces(textposition="outside", textfont=dict(color="#6A655C", size=11),
+                          marker_line_width=0)
+        style_plotly(fig, height=300)
+        fig.update_layout(coloraxis_showscale=False, xaxis_title="설비코드", yaxis_title="건수")
         st.plotly_chart(fig, use_container_width=True)

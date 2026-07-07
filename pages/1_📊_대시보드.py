@@ -3,7 +3,7 @@ import sys, os
 import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, get_available_years, init_db
-from utils.style import inject_css, page_header, kpi_cards
+from utils.style import inject_css, page_header, kpi_cards, style_plotly, IRIS, GOLD, CHART_SEQ, CHART_GRAD
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
@@ -11,12 +11,7 @@ from datetime import datetime
 
 init_db()
 
-inject_css("""
-.alert-box {
-    background: #FFF7ED; border-left: 4px solid #F97316;
-    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 8px 0;
-}
-""")
+inject_css()
 
 # ─── 헤더 ───
 current_year = datetime.now().year
@@ -55,22 +50,17 @@ with chart_col1:
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=df_monthly["월명"], y=df_monthly["건수"],
-            marker_color="#2563EB", name="보전건수",
+            marker_color=IRIS, marker_line_width=0, name="보전건수",
             text=df_monthly["건수"].astype(int),
-            textposition="outside",
+            textposition="outside", textfont=dict(color="#6A655C", size=11),
+            width=0.62,
         ))
         fig.add_trace(go.Scatter(
             x=df_monthly["월명"], y=df_monthly["건수"],
-            mode="lines+markers", line=dict(color="#F97316", width=2),
-            marker=dict(size=6), name="추세",
+            mode="lines+markers", line=dict(color=GOLD, width=2.5, shape="spline"),
+            marker=dict(size=7, color=GOLD, line=dict(color="white", width=1.5)), name="추세",
         ))
-        fig.update_layout(
-            height=320, plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=20, b=0),
-            legend=dict(orientation="h", y=1.1),
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-        )
+        style_plotly(fig, height=320, showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("데이터가 없습니다.")
@@ -79,17 +69,16 @@ with chart_col2:
     st.subheader("🏭 팩토리별 건수")
     df_fac = get_factory_count(year_sel)
     if not df_fac.empty:
-        colors = ["#2563EB", "#3B82F6", "#60A5FA", "#93C5FD", "#BFDBFE"]
         fig2 = px.pie(
-            df_fac, names="팩토리", values="건수",
-            color_discrete_sequence=colors,
-            hole=0.45,
+            df_fac, names="팭토리", values="건수",
+            color_discrete_sequence=CHART_SEQ,
+            hole=0.55,
         )
-        fig2.update_traces(textposition="outside", textinfo="label+percent")
-        fig2.update_layout(
-            height=320, margin=dict(l=0, r=0, t=20, b=0),
-            showlegend=False, paper_bgcolor="white",
+        fig2.update_traces(
+            textposition="outside", textinfo="label+percent",
+            marker=dict(line=dict(color="white", width=2)),
         )
+        style_plotly(fig2, height=320)
         st.plotly_chart(fig2, use_container_width=True)
     else:
         st.info("데이터가 없습니다.")
@@ -106,17 +95,13 @@ with chart_col3:
             x="건수", y="이슈코드",
             orientation="h",
             color="건수",
-            color_continuous_scale=["#BFDBFE", "#2563EB"],
+            color_continuous_scale=CHART_GRAD,
             text="건수",
         )
-        fig3.update_traces(textposition="outside")
-        fig3.update_layout(
-            height=380, plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=20, b=0),
-            coloraxis_showscale=False,
-            xaxis=dict(showgrid=True, gridcolor="#F1F5F9"),
-            yaxis=dict(showgrid=False),
-        )
+        fig3.update_traces(textposition="outside", textfont=dict(color="#6A655C", size=11),
+                           marker_line_width=0)
+        style_plotly(fig3, height=380)
+        fig3.update_layout(coloraxis_showscale=False)
         st.plotly_chart(fig3, use_container_width=True)
     else:
         st.info("데이터가 없습니다.")
@@ -127,22 +112,22 @@ with chart_col4:
     if not df_over.empty:
         for _, row in df_over.iterrows():
             days = int(row["경과일수"])
-            color = "#DC2626" if days >= 60 else "#F97316"
+            color = "#D6485B" if days >= 60 else "#C98A18"
             fac_txt = html.escape(str(row['factory']))
             code_txt = html.escape(str(row['equipment_code']))
             desc_txt = html.escape(str(row['issue_desc'])[:30]) if row['issue_desc'] else '내용 없음'
             status_txt = html.escape(str(row['status']))
             st.markdown(f"""
-            <div style="background:white;border-left:4px solid {color};
-                padding:10px 14px;border-radius:0 8px 8px 0;margin:6px 0;
-                border:1px solid #E2E8F0;">
-                <div style="font-weight:600;font-size:0.9rem;color:#1E293B;">
+            <div style="background:white;border-left:3px solid {color};
+                padding:11px 15px;border-radius:0 12px 12px 0;margin:7px 0;
+                border:1px solid #EAE7E0;box-shadow:0 1px 2px rgba(26,24,20,.05);">
+                <div style="font-weight:700;font-size:0.9rem;color:#1A1814;letter-spacing:-.01em;">
                     {fac_txt} · {code_txt}
                 </div>
-                <div style="font-size:0.82rem;color:#64748B;margin-top:2px;">
+                <div style="font-size:0.82rem;color:#6A655C;margin-top:3px;">
                     {desc_txt}
                 </div>
-                <div style="font-size:0.8rem;color:{color};font-weight:600;margin-top:4px;">
+                <div style="font-size:0.78rem;color:{color};font-weight:700;margin-top:5px;">
                     ⏰ {days}일 경과 · {status_txt}
                 </div>
             </div>

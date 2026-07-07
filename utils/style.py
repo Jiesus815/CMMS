@@ -72,8 +72,9 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
     box-shadow: 0 6px 16px rgba(110,98,230,.35), inset 0 1px 0 rgba(255,255,255,.3);
 }
 .ah-kicker { font-size:.66rem; font-weight:600; letter-spacing:.22em; text-transform:uppercase; color: var(--iris); }
-.ah-title { font-family:'Instrument Serif','Noto Sans KR',serif; font-weight:400; font-size:2.5rem; line-height:1.02; margin:2px 0 0; color: var(--tx1); letter-spacing:-.01em; }
-.ah-sub   { font-size:.85rem; color: var(--tx2); margin:6px 0 0; }
+.ah-title { font-family:'Instrument Serif','Noto Sans KR',serif; font-weight:400; font-size:2.6rem; line-height:1.02; margin:2px 0 0; letter-spacing:-.015em;
+    background: linear-gradient(120deg, var(--tx1) 55%, var(--iris-ink)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color: var(--tx1); }
+.ah-sub   { font-size:.86rem; color: var(--tx2); margin:7px 0 0; letter-spacing:.005em; }
 .ah-divider { margin-top:18px; height:1px; background: var(--hair); }
 
 /* ── KPI 그리드 ── */
@@ -83,22 +84,32 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .kpi-grid-5 { grid-template-columns: repeat(5, 1fr); }
 
 .kpi-card {
-    background: var(--surface); border:1px solid var(--border); border-radius: var(--r-lg);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.72)),
+        var(--surface);
+    border:1px solid var(--border); border-radius: var(--r-lg);
     padding: 20px 22px 18px; position:relative; overflow:hidden;
     box-shadow: var(--sh-sm); animation: rise .55s var(--ease) both;
-    transition: transform .28s var(--ease), box-shadow .28s var(--ease);
+    transition: transform .28s var(--ease), box-shadow .28s var(--ease), border-color .28s var(--ease);
+    backdrop-filter: blur(6px);
 }
 .kpi-card::before {
-    content:''; position:absolute; top:0; left:0; right:0; height:1px;
-    background: linear-gradient(90deg,transparent,rgba(110,98,230,.4),transparent);
-    opacity:0; transition: opacity .3s var(--ease);
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--iris), var(--gold));
+    opacity:.5; transition: opacity .3s var(--ease);
 }
-.kpi-card:hover { transform: translateY(-4px); box-shadow: var(--sh-md); }
+.kpi-card::after {
+    content:''; position:absolute; right:-40px; top:-40px; width:120px; height:120px;
+    background: radial-gradient(circle, rgba(110,98,230,.10), transparent 70%);
+    pointer-events:none; opacity:0; transition: opacity .35s var(--ease);
+}
+.kpi-card:hover { transform: translateY(-5px); box-shadow: var(--sh-md); border-color: var(--border-2); }
 .kpi-card:hover::before { opacity:1; }
+.kpi-card:hover::after { opacity:1; }
 
 .kpi-top { display:flex; align-items:center; gap:8px; }
-.kpi-lbl { font-size:.75rem; font-weight:500; color: var(--tx2); }
-.kpi-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.kpi-lbl { font-size:.75rem; font-weight:600; color: var(--tx2); letter-spacing:.01em; }
+.kpi-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 .dot-iris{ background: var(--iris); box-shadow:0 0 0 3px rgba(110,98,230,.16); }
 .dot-ok  { background: var(--ok);   box-shadow:0 0 0 3px rgba(47,163,122,.16); }
 .dot-warn{ background: var(--warn); box-shadow:0 0 0 3px rgba(201,138,24,.16); }
@@ -107,7 +118,12 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .dot-mute{ background: var(--tx3);  box-shadow:0 0 0 3px rgba(156,151,140,.16); }
 
 .kpi-ico { display:none; }  /* Atelier: 아이콘 대신 도트 사용 */
-.kpi-val { font-family:'Inter','Noto Sans KR',sans-serif; font-weight:800; font-size:34px; color: var(--tx1); line-height:1; letter-spacing:-.03em; margin-top:16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kpi-val {
+    font-family:'Inter','Noto Sans KR',sans-serif; font-weight:800; font-size:34px; line-height:1;
+    letter-spacing:-.03em; margin-top:16px; font-variant-numeric: tabular-nums; white-space: nowrap;
+    background: linear-gradient(135deg, var(--tx1) 30%, var(--iris-ink)); -webkit-background-clip: text;
+    background-clip: text; -webkit-text-fill-color: transparent; color: var(--tx1);
+}
 .kpi-sub { font-size:.72rem; color: var(--tx3); margin-top:11px; font-weight:500; }
 
 /* ── 상태 배지 ── */
@@ -165,13 +181,13 @@ section[data-testid="stSidebar"] a { font-weight: 500 !important; }
 .stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] { display:none; }
 
 /* ── 데이터프레임 ── */
-.stDataFrame { border-radius: var(--r-md); overflow: hidden; border:1px solid var(--border); }
+.stDataFrame { border-radius: var(--r-md); overflow: hidden; border:1px solid var(--border); box-shadow: var(--sh-sm); }
 .stDataFrame thead tr th {
     background: var(--bg-tint) !important; color: var(--tx3) !important;
-    font-weight: 600 !important; font-size: 11px !important;
+    font-weight: 700 !important; font-size: 11px !important;
     text-transform: uppercase; letter-spacing: .08em;
 }
-.stDataFrame tbody tr:hover td { background: rgba(110,98,230,.04) !important; }
+.stDataFrame tbody tr:hover td { background: rgba(110,98,230,.05) !important; }
 
 /* ── 입력 요소 ── */
 [data-baseweb="select"] > div, .stTextInput input, .stNumberInput input, .stDateInput input {
@@ -306,3 +322,41 @@ def status_badge(status: str) -> str:
     """상태 문자열 → HTML 배지 반환"""
     bc = _STATUS_BADGE.get(status, "badge-pend")
     return f'<span class="badge {bc}"><span class="led"></span>{status}</span>'
+
+
+# ─── 차트 색상 팔레트 (Atelier 아이리스/골드) ────────────────────
+IRIS      = "#6E62E6"
+IRIS_2    = "#9A7CF0"
+IRIS_INK  = "#4B41B8"
+GOLD      = "#C9A24B"
+INK       = "#1A1814"
+TX2       = "#6A655C"
+GRID      = "rgba(26,24,20,.06)"
+
+# 범주형 시퀀스 (파이/막대 등)
+CHART_SEQ = ["#6E62E6", "#9A7CF0", "#C9A24B", "#2FA37A", "#D6485B", "#4B41B8", "#B98A2E"]
+# 연속형 그라디언트 (연한 아이리스 → 진한 아이리스)
+CHART_GRAD = ["#ECEAFB", "#C7BEF4", "#9A7CF0", "#6E62E6"]
+
+
+def style_plotly(fig, height: int = 320, showlegend: bool = False):
+    """Plotly figure에 Atelier 공통 테마를 입힌다."""
+    fig.update_layout(
+        height=height,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, Noto Sans KR, sans-serif", color=INK, size=12),
+        margin=dict(l=0, r=6, t=24, b=0),
+        colorway=CHART_SEQ,
+        showlegend=showlegend,
+        legend=dict(orientation="h", y=1.14, x=0, font=dict(size=11, color=TX2)),
+        hoverlabel=dict(
+            bgcolor="white", bordercolor="rgba(26,24,20,.1)",
+            font=dict(family="Inter, Noto Sans KR, sans-serif", color=INK, size=12),
+        ),
+    )
+    fig.update_xaxes(showgrid=False, zeroline=False, showline=False,
+                     tickfont=dict(color=TX2, size=11), title_font=dict(color=TX2, size=11))
+    fig.update_yaxes(showgrid=True, gridcolor=GRID, zeroline=False, showline=False,
+                     tickfont=dict(color=TX2, size=11), title_font=dict(color=TX2, size=11))
+    return fig

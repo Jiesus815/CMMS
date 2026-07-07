@@ -1,7 +1,7 @@
 import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import get_conn, init_db
+from utils.database import get_issue_code_full, get_part_codes, add_issue_code, init_db
 from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
 
@@ -14,12 +14,7 @@ page_header("🏷️ 이슈 코드 관리", "부품코드 + 이슈코드 조합 
 tab1, tab2 = st.tabs(["📋 코드 목록", "➕ 코드 추가"])
 
 with tab1:
-    conn = get_conn()
-    df = pd.read_sql_query(
-        "SELECT id, part_name, part_name_en, part_code, issue_name, issue_name_en, issue_code, full_code FROM issue_code ORDER BY part_code, issue_code",
-        conn,
-    )
-    conn.close()
+    df = get_issue_code_full()
 
     search = st.text_input("🔍 검색 (부품명/이슈명/코드)", placeholder="예: GCM, 파손, 모터...")
     if search:
@@ -42,12 +37,7 @@ with tab1:
     # 부품코드 요약
     st.markdown("---")
     st.subheader("📦 부품코드 목록")
-    conn2 = get_conn()
-    df_parts = pd.read_sql_query(
-        "SELECT DISTINCT part_code, part_name, part_name_en FROM issue_code ORDER BY part_code",
-        conn2,
-    )
-    conn2.close()
+    df_parts = get_part_codes()
     col1, col2 = st.columns(2)
     half = len(df_parts) // 2
     with col1:
@@ -75,16 +65,10 @@ with tab2:
             st.error("필수 항목을 입력하세요.")
         else:
             full = f"{n_part_code}-{n_issue_code}"
-            conn = get_conn()
             try:
-                c = conn.cursor()
-                c.execute(
-                    "INSERT INTO issue_code (part_name,part_name_en,part_code,issue_name,issue_name_en,issue_code,full_code) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (full_code) DO NOTHING",
-                    (n_part_name, n_part_en, n_part_code, n_issue_name, n_issue_en, n_issue_code, full),
-                )
-                conn.commit()
-                st.success(f"✅ '{full}' 코드가 추가되었습니다!")
+                if add_issue_code(n_part_name, n_part_en, n_part_code, n_issue_name, n_issue_en, n_issue_code):
+                    st.success(f"✅ '{full}' 코드가 추가되었습니다!")
+                else:
+                    st.warning(f"⚠️ '{full}' 코드는 이미 존재합니다.")
             except Exception as e:
-                st.error(f"중복된 코드이거나 오류가 발생했습니다: {e}")
-            finally:
-                conn.close()
+                st.error(f"오류가 발생했습니다: {e}")

@@ -16,3 +16,19 @@ CATEGORY_LIST = [
     "자동애벌기", "자동투입기", "C-Line", "린서", "건조기", "컨베이어",
     "펌프", "판넬", "유틸리티", "기타",
 ]
+
+# ─── 슬랙 연동 ───
+# 메시지 텍스트에 이 단어 중 하나라도 포함되면 완료로 판단
+SLACK_COMPLETION_KEYWORDS = ["완료"]
+
+# 이 이모티콘(reaction name)이 달리면 완료로 전환
+SLACK_COMPLETION_REACTIONS = {
+    "white_check_mark",   # ✅
+    "heavy_check_mark",   # ✔️
+    "done",
+    "완료",               # 커스텀 이모티콘
+    "check",
+}
+
+# 본문에 이 키워드가 2개 이상 포함되면 워크플로우(보전요청) 메시지로 판단
+SLACK_WORKFLOW_KEYWORDS = ["팩토리", "설비명", "증상", "점검"]

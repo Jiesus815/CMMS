@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 
 from utils.database import get_slack_requests, get_slack_unmatched, init_db
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 
 init_db()
 
@@ -99,15 +99,11 @@ tab1, tab2 = st.tabs(["📋 수집된 보전요청", "⚠️ 미매칭 데이터
 # 탭1: 수집된 보전요청 목록
 # ══════════════════════════════
 with tab1:
-    fc1, fc2, fc3 = st.columns([2, 2, 1])
+    fc1, fc2 = st.columns([1, 1])
     with fc1:
         f_status = st.selectbox("진행상태", ["전체", "진행 중", "완료"], key="sl_status")
     with fc2:
         f_channel = st.text_input("채널명 필터", placeholder="예: 클린허브", key="sl_ch")
-    with fc3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔍 조회", key="sl_search"):
-            pass
 
     df = get_slack_requests(
         status=None if f_status == "전체" else f_status,
@@ -121,13 +117,14 @@ with tab1:
         total = len(df)
         done = len(df[df["status"] == "완료"])
         in_prog = len(df[df["status"] == "진행 중"])
-        unmatched = len(df[df["is_matched"] == False])
+        unmatched = int((~df["is_matched"].astype(bool)).sum())
 
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("전체", total)
-        k2.metric("진행 중", in_prog)
-        k3.metric("완료", done)
-        k4.metric("미매칭", unmatched)
+        kpi_cards([
+            {"label": "전체 수집", "value": f"{total:,}건", "color": "blue",  "sub": "누적 보전요청"},
+            {"label": "진행 중",  "value": f"{in_prog:,}건", "color": "amber", "sub": "미완료"},
+            {"label": "완료",     "value": f"{done:,}건",   "color": "green", "sub": "처리 완료"},
+            {"label": "미매칭",   "value": f"{unmatched:,}건", "color": "red",   "sub": "설비/팭토리 불일치"},
+        ])
 
         st.markdown("---")
 
