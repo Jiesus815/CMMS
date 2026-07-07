@@ -1,5 +1,6 @@
 import streamlit as st
 import sys, os
+import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_equipment, upsert_equipment, delete_equipment, init_db
 from utils.constants import FACTORIES, EQUIPMENT_STATUS_LIST as STATUS_LIST, CATEGORY_LIST
@@ -62,7 +63,7 @@ with tab1:
             pending = len(df_fac[df_fac["status"] == "팬딩"])
             broken = len(df_fac[df_fac["status"] == "고장"])
 
-            st.markdown(f"### 🏭 {fac}  <span style='font-size:0.9rem; color:#64748B;'>총 {len(df_fac)}대 &nbsp;·&nbsp; 🟢 {normal} &nbsp;🟡 {checking} &nbsp;🟠 {pending} &nbsp;🔴 {broken}</span>", unsafe_allow_html=True)
+            st.markdown(f"### 🏭 {html.escape(str(fac))}  <span style='font-size:0.9rem; color:#64748B;'>총 {len(df_fac)}대 &nbsp;·&nbsp; 🟢 {normal} &nbsp;🟡 {checking} &nbsp;🟠 {pending} &nbsp;🔴 {broken}</span>", unsafe_allow_html=True)
 
             display_cols = ["equipment_code", "equipment_name", "category", "location", "status", "memo"]
             display_cols = [c for c in display_cols if c in df_fac.columns]

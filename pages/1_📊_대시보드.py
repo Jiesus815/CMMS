@@ -1,5 +1,6 @@
 import streamlit as st
 import sys, os
+import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, init_db
 from utils.style import inject_css, page_header, kpi_cards
@@ -125,18 +126,22 @@ with chart_col4:
         for _, row in df_over.iterrows():
             days = int(row["경과일수"])
             color = "#DC2626" if days >= 60 else "#F97316"
+            fac_txt = html.escape(str(row['factory']))
+            code_txt = html.escape(str(row['equipment_code']))
+            desc_txt = html.escape(str(row['issue_desc'])[:30]) if row['issue_desc'] else '내용 없음'
+            status_txt = html.escape(str(row['status']))
             st.markdown(f"""
             <div style="background:white;border-left:4px solid {color};
                 padding:10px 14px;border-radius:0 8px 8px 0;margin:6px 0;
                 border:1px solid #E2E8F0;">
                 <div style="font-weight:600;font-size:0.9rem;color:#1E293B;">
-                    {row['factory']} · {row['equipment_code']}
+                    {fac_txt} · {code_txt}
                 </div>
                 <div style="font-size:0.82rem;color:#64748B;margin-top:2px;">
-                    {row['issue_desc'][:30] if row['issue_desc'] else '내용 없음'}
+                    {desc_txt}
                 </div>
                 <div style="font-size:0.8rem;color:{color};font-weight:600;margin-top:4px;">
-                    ⏰ {days}일 경과 · {row['status']}
+                    ⏰ {days}일 경과 · {status_txt}
                 </div>
             </div>
             """, unsafe_allow_html=True)
