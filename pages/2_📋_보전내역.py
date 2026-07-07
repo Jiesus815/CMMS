@@ -12,7 +12,6 @@ from datetime import datetime, date
 
 init_db()
 
-st.set_page_config(page_title="보전내역 · CMMS", page_icon="📋", layout="wide")
 inject_css()
 
 page_header("📋 보전내역 관리", "보전 작업 등록 · 조회 · 수정 · 삭제")

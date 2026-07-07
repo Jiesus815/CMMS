@@ -10,7 +10,6 @@ from utils.style import inject_css, page_header
 
 init_db()
 
-st.set_page_config(page_title="슬랙 연동 · CMMS", page_icon="💬", layout="wide")
 inject_css()
 
 page_header("💬 슬랙 보전요청 연동", "슬랙 채널에서 보전 요청을 자동으로 수집합니다")

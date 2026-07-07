@@ -7,7 +7,6 @@ import pandas as pd
 
 init_db()
 
-st.set_page_config(page_title="이슈코드 · CMMS", page_icon="🏷️", layout="wide")
 inject_css()
 
 page_header("🏷️ 이슈 코드 관리", "부품코드 + 이슈코드 조합 테이블 관리")

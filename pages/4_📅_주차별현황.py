@@ -3,13 +3,12 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_weekly_pivot, get_maintenance, init_db
 from utils.constants import FACTORIES
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
 from datetime import datetime
 
 init_db()
 
-st.set_page_config(page_title="주차별 현황 · CMMS", page_icon="📅", layout="wide")
 inject_css()
 
 page_header("📅 주차별 보전 현황표", "설비별 주차(Week) 보전 건수 피벗 테이블")
@@ -47,10 +46,11 @@ else:
     pivot.columns.name = None
 
     # 요약 정보
-    m1, m2, m3 = st.columns(3)
-    m1.metric("설비 수", f"{len(pivot)}대")
-    m2.metric("총 보전 건수", f"{int(pivot['계'].sum()):,}건")
-    m3.metric("평균 건수/설비", f"{pivot['계'].mean():.1f}건")
+    kpi_cards([
+        {"label": "설비 수",       "value": f"{len(pivot)}대",                 "color": "blue",   "sub": "대상 설비"},
+        {"label": "총 보전 건수",  "value": f"{int(pivot['계'].sum()):,}건",       "color": "green",  "sub": "누적"},
+        {"label": "평균 건수/설비", "value": f"{pivot['계'].mean():.1f}건",       "color": "purple", "sub": "설비당"},
+    ])
 
     st.markdown("")
 

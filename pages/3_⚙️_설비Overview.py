@@ -4,13 +4,12 @@ import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_equipment, upsert_equipment, delete_equipment, init_db
 from utils.constants import FACTORIES, EQUIPMENT_STATUS_LIST as STATUS_LIST, CATEGORY_LIST
-from utils.style import inject_css, page_header
+from utils.style import inject_css, page_header, kpi_cards
 import pandas as pd
 from datetime import date
 
 init_db()
 
-st.set_page_config(page_title="설비 Overview · CMMS", page_icon="⚙️", layout="wide")
 inject_css()
 
 page_header("⚙️ 설비 Overview", "설비 상태 현황 · 등록 · 수정")
@@ -30,13 +29,13 @@ with tab1:
     df_all = get_equipment()
 
     # 전체 KPI (선택과 무관하게 전체 기준)
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("전체 설비", f"{len(df_all)}대")
-    m2.metric("🟢 정상", f"{len(df_all[df_all['status']=='정상'])}대")
-    m3.metric("🟡 점검중", f"{len(df_all[df_all['status']=='점검중'])}대")
-    m4.metric("🟠 팬딩", f"{len(df_all[df_all['status']=='팬딩'])}대")
-    m5.metric("🔴 고장", f"{len(df_all[df_all['status']=='고장'])}대")
-    st.markdown("")
+    kpi_cards([
+        {"label": "전체 설비", "value": f"{len(df_all)}대", "color": "blue",   "sub": "등록 설비"},
+        {"label": "정상",      "value": f"{len(df_all[df_all['status']=='정상'])}대",   "color": "green",  "sub": "🟢 가동"},
+        {"label": "점검중",    "value": f"{len(df_all[df_all['status']=='점검중'])}대", "color": "amber",  "sub": "🟡 진행"},
+        {"label": "팬딩",      "value": f"{len(df_all[df_all['status']=='팬딩'])}대",   "color": "purple", "sub": "🟠 대기"},
+        {"label": "고장",      "value": f"{len(df_all[df_all['status']=='고장'])}대",   "color": "red",    "sub": "🔴 정지"},
+    ])
 
     # 팩토리 필터 적용
     df = df_all.copy()

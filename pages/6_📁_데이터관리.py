@@ -8,7 +8,6 @@ from datetime import datetime
 
 init_db()
 
-st.set_page_config(page_title="데이터 관리 · CMMS", page_icon="📁", layout="wide")
 inject_css("""
 .info-card {
     background: white; border: 1px solid #E2E8F0;

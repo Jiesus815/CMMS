@@ -11,7 +11,6 @@ from datetime import datetime
 
 init_db()
 
-st.set_page_config(page_title="대시보드 · CMMS", page_icon="📊", layout="wide")
 inject_css("""
 .alert-box {
     background: #FFF7ED; border-left: 4px solid #F97316;
