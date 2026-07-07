@@ -125,7 +125,7 @@ with chart_col4:
         if not df_over.empty:
             cards_html = '<div style="max-height:212px;overflow-y:auto;padding-right:4px;">'
             for _, row in df_over.iterrows():
-                days = int(row["경과일수"])
+                days = int(row["overdue_days"])
                 color = "#D6485B" if days >= 60 else "#C98A18"
                 fac_txt = html.escape(str(row['factory']))
                 code_txt = html.escape(str(row['equipment_code']))

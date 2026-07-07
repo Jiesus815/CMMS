@@ -618,12 +618,12 @@ def get_overdue(days=30):
     with db_connection() as conn:
         return pd.read_sql_query(
             """SELECT id, factory, equipment_code, equipment_name, recv_date, status, issue_desc,
-                (CURRENT_DATE - recv_date::date)::INTEGER as 경과일수
+                (CURRENT_DATE - recv_date::date)::INTEGER as overdue_days
                 FROM maintenance
                 WHERE status IN ('진행 중','팬딩')
                 AND recv_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
                 AND (CURRENT_DATE - recv_date::date)::INTEGER >= %s
-                ORDER BY 경과일수 DESC""",
+                ORDER BY overdue_days DESC""",
             conn,
             params=[days],
         )
