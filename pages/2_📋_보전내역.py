@@ -41,6 +41,7 @@ def maintenance_edit_dialog(row, edit_id):
             value=pd.to_datetime(row["comp_date"]).date() if row["comp_date"] else date.today())
         e_downtime = st.number_input("고장시간(분)", value=int(row["downtime_min"] or 0), min_value=0)
         e_assignee = st.text_input("담당자", value=row["assignee"] or "")
+        e_cost = st.number_input("수리비(원)", value=int(row.get("cost") or 0), min_value=0, step=1000)
 
     e_issue_desc = st.text_area("이상 접수 내용", value=row["issue_desc"] or "", height=80)
     e_root_cause = st.text_area("발생원인", value=row["root_cause"] or "", height=80)
@@ -56,7 +57,7 @@ def maintenance_edit_dialog(row, edit_id):
                 "comp_date": str(e_comp_date),
                 "downtime_min": e_downtime, "assignee": e_assignee,
                 "issue_desc": e_issue_desc, "root_cause": e_root_cause,
-                "slack_link": e_slack,
+                "slack_link": e_slack, "cost": e_cost,
             })
             st.cache_data.clear()
             st.rerun()
@@ -101,11 +102,13 @@ with tab1:
         done = len(df[df["status"] == "완료"])
         pending = len(df[df["status"].isin(["진행 중", "팬딩"])])
         rate = round(done / total * 100, 1) if total else 0
+        total_cost = int(df["cost"].sum()) if "cost" in df.columns else 0
         kpi_cards([
             {"label": "총 건수",  "value": f"{total:,}건", "icon": "📦", "color": "blue",   "sub": "전체 접수"},
             {"label": "완료",    "value": f"{done:,}건",  "icon": "✅", "color": "green",  "sub": "처리 완료"},
             {"label": "미완료",  "value": f"{pending:,}건","icon": "⏳", "color": "amber",  "sub": "진행 중 + 팬딩"},
             {"label": "처리율",  "value": f"{rate}%",     "icon": "📈", "color": "purple", "sub": "목표 95%"},
+            {"label": "총 수리비", "value": f"{total_cost:,}원", "icon": "💰", "color": "red", "sub": "누적 비용"},
         ])
 
     if df.empty:
@@ -148,6 +151,7 @@ with tab1:
             recv = html.escape(str(row.get("recv_date") or "-"))
             comp = html.escape(str(row.get("comp_date") or ""))
             down = row.get("downtime_min") or 0
+            cost = row.get("cost") or 0
             assignee = html.escape(str(row.get("assignee") or ""))
             desc = html.escape(str(row.get("issue_desc") or "").strip())
 
@@ -156,6 +160,8 @@ with tab1:
                 meta += f'<span>✅ 조치 {comp}</span>'
             if down:
                 meta += f'<span>⏱️ <b>{int(down)}</b>분</span>'
+            if cost:
+                meta += f'<span>💰 <b>{int(cost):,}</b>원</span>'
             if assignee:
                 meta += f'<span>👤 {assignee}</span>'
             desc_html = f'<div class="rec-desc">{desc}</div>' if desc else ''
@@ -285,6 +291,7 @@ with tab2:
                 n_comp_min = st.number_input("조치 분", min_value=0, max_value=59, value=0)
 
         n_downtime = st.number_input("고장시간 (분)", min_value=0, value=0)
+        n_cost = st.number_input("수리비 (원)", min_value=0, value=0, step=1000)
         n_issue_desc = st.text_area("이상 접수 내용 *", height=80, placeholder="발생한 이상 내용을 입력하세요")
         n_root_cause = st.text_area("발생원인", height=80, placeholder="원인 분석 내용")
         n_slack = st.text_input("슬랙 링크", placeholder="https://...")
@@ -306,6 +313,7 @@ with tab2:
                 "assignee": n_assignee, "contractor_type": n_contractor,
                 "recv_type": n_recv_type, "issue_desc": n_issue_desc,
                 "root_cause": n_root_cause, "slack_link": n_slack,
+                "cost": n_cost,
             })
             st.cache_data.clear()
             flash("보전 작업이 등록되었습니다")

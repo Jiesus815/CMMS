@@ -287,6 +287,7 @@ def init_db():
     # 기존 행은 DEFAULT 1 로 자동 backfill 되어 '기본' 테넌트에 귀속된다.
     for _tbl in ("equipment", "maintenance", "work_log", "slack_requests", "slack_unmatched"):
         c.execute(f"ALTER TABLE {_tbl} ADD COLUMN IF NOT EXISTS tenant_id INTEGER DEFAULT 1")
+    c.execute("ALTER TABLE maintenance ADD COLUMN IF NOT EXISTS cost INTEGER DEFAULT 0")
     # 설비코드 전역 UNIQUE → (tenant_id, equipment_code) 복합 UNIQUE 로 전환
     c.execute("ALTER TABLE equipment DROP CONSTRAINT IF EXISTS equipment_equipment_code_key")
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS equipment_tenant_code_uidx ON equipment (tenant_id, equipment_code)")
@@ -545,8 +546,8 @@ def insert_maintenance(data: dict, conn=None):
             comp_year, comp_month, comp_week, comp_date, comp_hour, comp_min,
             downtime_min, loss_time, holiday_between,
             assignee, contractor_type, recv_type, issue_desc, root_cause, slack_link,
-            created_at, updated_at, tenant_id
-        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            created_at, updated_at, tenant_id, cost
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
     """, (
         data.get("factory"), data.get("shift"), data.get("status","진행 중"),
         data.get("region"), data.get("equipment_code"), data.get("equipment_name"),
@@ -558,7 +559,7 @@ def insert_maintenance(data: dict, conn=None):
         data.get("downtime_min", 0), data.get("loss_time", 0), data.get("holiday_between", 0),
         data.get("assignee"), data.get("contractor_type"), data.get("recv_type"),
         data.get("issue_desc"), data.get("root_cause"), data.get("slack_link"),
-        now, now, tid
+        now, now, tid, int(data.get("cost", 0) or 0)
     ))
     eq_code = data.get("equipment_code")
     status = data.get("status", "진행 중")
@@ -612,7 +613,7 @@ def update_maintenance(m_id: int, data: dict):
                 issue_code=%s, comp_year=%s, comp_month=%s, comp_week=%s,
                 comp_date=%s, comp_hour=%s, comp_min=%s,
                 downtime_min=%s, loss_time=%s, assignee=%s, contractor_type=%s,
-                recv_type=%s, issue_desc=%s, root_cause=%s, slack_link=%s, updated_at=%s
+                recv_type=%s, issue_desc=%s, root_cause=%s, slack_link=%s, cost=%s, updated_at=%s
             WHERE id=%s AND tenant_id=%s
         """, (
             data.get("factory"), data.get("shift"), data.get("status"),
@@ -623,7 +624,7 @@ def update_maintenance(m_id: int, data: dict):
             data.get("downtime_min", 0), data.get("loss_time", 0),
             data.get("assignee"), data.get("contractor_type"),
             data.get("recv_type"), data.get("issue_desc"), data.get("root_cause"),
-            data.get("slack_link"), now, m_id, tid
+            data.get("slack_link"), int(data.get("cost", 0) or 0), now, m_id, tid
         ))
         eq_code = data.get("equipment_code")
         status = data.get("status")
