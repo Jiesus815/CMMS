@@ -4,13 +4,14 @@ import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import get_equipment, upsert_equipment, delete_equipment, init_db
 from utils.constants import FACTORIES, EQUIPMENT_STATUS_LIST as STATUS_LIST, CATEGORY_LIST
-from utils.style import inject_css, page_header, kpi_cards
+from utils.style import inject_css, page_header, kpi_cards, flash, render_flash
 import pandas as pd
 from datetime import date
 
 init_db()
 
 inject_css()
+render_flash()
 
 page_header("⚙️ 설비 Overview", "설비 상태 현황 · 등록 · 수정")
 
@@ -172,5 +173,7 @@ with tab2:
                 "category": n_cat, "location": n_loc, "status": n_st,
                 "install_date": str(n_install), "memo": n_memo,
             })
-            st.success(f"✅ '{n_code}' 설비가 등록되었습니다!")
+            st.cache_data.clear()
+            flash(f"'{n_code}' 설비가 등록되었습니다")
+            st.rerun()
 

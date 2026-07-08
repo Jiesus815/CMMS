@@ -7,13 +7,14 @@ from utils.database import (
     get_equipment, get_issue_code_options, get_issue_codes, get_available_years, init_db
 )
 from utils.constants import FACTORIES, MAINTENANCE_STATUS_LIST as STATUS_LIST, SHIFT_LIST, RECV_TYPE_LIST, CONTRACTOR_LIST
-from utils.style import inject_css, page_header, kpi_cards, status_badge
+from utils.style import inject_css, page_header, kpi_cards, status_badge, flash, render_flash
 import pandas as pd
 from datetime import datetime, date
 
 init_db()
 
 inject_css()
+render_flash()
 
 page_header("📋 보전내역 관리", "보전 작업 등록 · 조회 · 수정 · 삭제")
 
@@ -308,7 +309,7 @@ with tab2:
                 "recv_type": n_recv_type, "issue_desc": n_issue_desc,
                 "root_cause": n_root_cause, "slack_link": n_slack,
             })
-            st.success("✅ 보전 작업이 등록되었습니다!")
             st.cache_data.clear()
-            st.balloons()
+            flash("보전 작업이 등록되었습니다")
+            st.rerun()
 

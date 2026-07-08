@@ -378,6 +378,18 @@ def status_badge(status: str) -> str:
     return f'<span class="badge {bc}"><span class="led"></span>{status}</span>'
 
 
+def flash(msg: str, icon: str = "✅") -> None:
+    """다음 rerun 이후에 표시할 토스트 메시지를 저장한다."""
+    st.session_state["_flash"] = (msg, icon)
+
+
+def render_flash() -> None:
+    """flash()로 저장된 메시지가 있으면 토스트로 표시하고 비운다."""
+    data = st.session_state.pop("_flash", None)
+    if data:
+        st.toast(data[0], icon=data[1])
+
+
 def chart_title(title: str, caption: str = "") -> None:
     """차트 카드용 컴팩트 타이틀(+선택 캡션) 렌더링."""
     st.markdown(

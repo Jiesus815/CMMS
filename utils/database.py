@@ -288,6 +288,7 @@ def _seed_holidays_2026(c, conn):
 
 
 # ─────────── 설비 CRUD ───────────
+@st.cache_data(ttl=300)
 def get_equipment(factory=None, status=None):
     q = "SELECT * FROM equipment WHERE 1=1"
     params = []
@@ -327,6 +328,7 @@ def delete_equipment(eq_id: int):
 
 
 # ─────────── 보전내역 CRUD ───────────
+@st.cache_data(ttl=300)
 def get_maintenance(factory=None, status=None, year=None, month=None, week=None):
     q = "SELECT * FROM maintenance WHERE 1=1"
     params = []
@@ -539,6 +541,7 @@ def get_available_years():
     return years
 
 
+@st.cache_data(ttl=300)
 def get_kpi(year=None):
     if year:
         where = "WHERE recv_year=%s"
@@ -566,6 +569,7 @@ def get_kpi(year=None):
     }
 
 
+@st.cache_data(ttl=300)
 def get_monthly_count(year=None):
     if year:
         where = "WHERE recv_year=%s"
@@ -581,6 +585,7 @@ def get_monthly_count(year=None):
         )
 
 
+@st.cache_data(ttl=300)
 def get_factory_count(year=None):
     if year:
         where = "WHERE recv_year=%s"
@@ -596,6 +601,7 @@ def get_factory_count(year=None):
         )
 
 
+@st.cache_data(ttl=300)
 def get_issue_top(year=None, limit=15):
     if year:
         where = "WHERE recv_year=%s AND"
@@ -611,6 +617,7 @@ def get_issue_top(year=None, limit=15):
         )
 
 
+@st.cache_data(ttl=300)
 def get_weekly_pivot(year=None, factory=None):
     where_parts = []
     params = []
@@ -632,6 +639,7 @@ def get_weekly_pivot(year=None, factory=None):
         )
 
 
+@st.cache_data(ttl=300)
 def get_overdue(days=30):
     with db_connection() as conn:
         return pd.read_sql_query(
@@ -893,6 +901,7 @@ def add_work_log(data: dict):
         ))
 
 
+@st.cache_data(ttl=300)
 def get_work_logs(year=None, month=None, author=None, factory=None):
     """작업일지 조회. 컬럼은 ASCII로 반환."""
     q = "SELECT id, log_date, author, factory, category, title, content FROM work_log WHERE 1=1"

@@ -4,12 +4,13 @@ import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils.database import add_work_log, get_work_logs, delete_work_log, get_available_years, init_db
 from utils.constants import FACTORIES
-from utils.style import inject_css, page_header, kpi_cards
+from utils.style import inject_css, page_header, kpi_cards, flash, render_flash
 from datetime import date, datetime
 
 init_db()
 
 inject_css()
+render_flash()
 
 page_header("📝 작업일지", "작업자가 직접 기록하는 일일 작업 이력")
 
@@ -114,7 +115,8 @@ with tab1:
                 st.caption(f"📌 {r['log_date']} · {r['author'] or '-'} · {r['title'] or '(제목 없음)'}")
         if st.button("선택한 일지 삭제", type="secondary"):
             delete_work_log(int(del_id))
-            st.success(f"ID {del_id} 삭제 완료!")
+            st.cache_data.clear()
+            flash(f"ID {del_id} 삭제 완료")
             st.rerun()
 
 # ══════════════════════════════
@@ -149,5 +151,6 @@ with tab2:
                 "title": n_title.strip(),
                 "content": n_content.strip(),
             })
-            st.success("✅ 작업일지가 저장되었습니다!")
-            st.balloons()
+            st.cache_data.clear()
+            flash("작업일지가 저장되었습니다")
+            st.rerun()
