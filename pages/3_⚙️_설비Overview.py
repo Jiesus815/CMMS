@@ -2,9 +2,12 @@ import streamlit as st
 import sys, os
 import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import get_equipment, upsert_equipment, delete_equipment, init_db
+from utils.database import (
+    get_equipment, upsert_equipment, delete_equipment, init_db,
+    get_equipment_history, get_equipment_stats,
+)
 from utils.constants import FACTORIES, EQUIPMENT_STATUS_LIST as STATUS_LIST, CATEGORY_LIST
-from utils.style import inject_css, page_header, kpi_cards, flash, render_flash
+from utils.style import inject_css, page_header, kpi_cards, status_badge, flash, render_flash
 import pandas as pd
 from datetime import date
 
@@ -50,7 +53,7 @@ def equipment_edit_dialog(row):
             st.rerun()
 
 
-tab1, tab2 = st.tabs(["📋 설비 목록", "➕ 설비 등록"])
+tab1, tab2, tab3 = st.tabs(["📋 설비 목록", "➕ 설비 등록", "📈 설비 이력"])
 
 # ══════════════════════════════
 # 탭1: 설비 목록
@@ -176,4 +179,70 @@ with tab2:
             st.cache_data.clear()
             flash(f"'{n_code}' 설비가 등록되었습니다")
             st.rerun()
+
+
+# ══════════════════════════════
+# 탭3: 설비 이력 · 지표(MTBF/MTTR)
+# ══════════════════════════════
+with tab3:
+    df_all_h = get_equipment()
+    if df_all_h.empty:
+        st.info("등록된 설비가 없습니다.")
+    else:
+        hc1, hc2 = st.columns([2, 3])
+        with hc1:
+            h_fac = st.selectbox("팭토리", ["전체"] + FACTORIES, key="hist_fac")
+        df_pick = df_all_h if h_fac == "전체" else df_all_h[df_all_h["factory"] == h_fac]
+        with hc2:
+            if df_pick.empty:
+                st.info("해당 팭토리 설비가 없습니다.")
+                pick_code = None
+            else:
+                opts = {r.equipment_code: f"{r.equipment_name} ({r.equipment_code})"
+                        for r in df_pick.itertuples()}
+                pick_code = st.selectbox("설비 선택", list(opts.keys()),
+                                         format_func=lambda x: opts[x], key="hist_eq")
+
+        if pick_code:
+            stt = get_equipment_stats(pick_code)
+            kpi_cards([
+                {"label": "총 보전 건수", "value": f"{stt['count']:,}건", "color": "blue", "sub": "누적 이력"},
+                {"label": "MTBF", "value": f"{stt['mtbf_days']}일", "color": "green", "sub": "평균 고장간격"},
+                {"label": "MTTR", "value": f"{stt['mttr']}분", "color": "amber", "sub": "평균 수리시간"},
+                {"label": "마지막 보전", "value": str(stt['last_date']), "color": "purple", "sub": "최근 접수일"},
+            ])
+            st.caption("MTBF=평균 고장 사이 간격(길수록 안정), MTTR=평균 수리 소요시간(짧을수록 빠름)")
+
+            df_h = get_equipment_history(pick_code)
+            if df_h.empty:
+                st.info("이 설비의 보전 이력이 없습니다.")
+            else:
+                _BC = {"완료": "#2FA37A", "진행 중": "#C98A18", "팬딩": "#9C978C",
+                       "고장": "#D6485B", "취소": "#9C978C"}
+                cards = '<div class="rec-scroll">'
+                for _, r in df_h.iterrows():
+                    status = str(r.get("status") or "")
+                    color = _BC.get(status, "#6E62E6")
+                    issue = html.escape(str(r.get("issue_code") or "-"))
+                    recv = html.escape(str(r.get("recv_date") or "-"))
+                    comp = html.escape(str(r.get("comp_date") or ""))
+                    down = r.get("downtime_min") or 0
+                    assignee = html.escape(str(r.get("assignee") or ""))
+                    desc = html.escape(str(r.get("issue_desc") or "").strip())
+                    meta = f'<span>🏷️ <b>{issue}</b></span><span>📅 {recv}</span>'
+                    if comp:
+                        meta += f'<span>✅ {comp}</span>'
+                    if down:
+                        meta += f'<span>⏱️ <b>{int(down)}</b>분</span>'
+                    if assignee:
+                        meta += f'<span>👤 {assignee}</span>'
+                    desc_html = f'<div class="rec-desc">{desc}</div>' if desc else ''
+                    cards += (
+                        f'<div class="rec-card" style="border-left-color:{color}">'
+                        f'<div class="rec-top">{status_badge(status)}'
+                        f'<span class="rec-spacer"></span></div>'
+                        f'<div class="rec-meta">{meta}</div>{desc_html}</div>'
+                    )
+                cards += '</div>'
+                st.markdown(cards, unsafe_allow_html=True)
 

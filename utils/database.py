@@ -805,6 +805,59 @@ def get_overdue(days=30):
     return _get_overdue_q(_current_tenant(), days)
 
 
+# ─────────── 설비별 이력 · 지표(MTBF/MTTR) ───────────
+@st.cache_data(ttl=300)
+def _get_equipment_history_q(tenant_id, equipment_code):
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT id, recv_date, comp_date, status, issue_code, issue_desc, "
+            "downtime_min, assignee "
+            "FROM maintenance WHERE tenant_id=%s AND equipment_code=%s "
+            "ORDER BY recv_date DESC, id DESC LIMIT 200",
+            conn, params=[tenant_id, equipment_code],
+        )
+
+
+def get_equipment_history(equipment_code):
+    return _get_equipment_history_q(_current_tenant(), equipment_code)
+
+
+@st.cache_data(ttl=300)
+def _get_equipment_stats_q(tenant_id, equipment_code):
+    with db_cursor() as (conn, c):
+        c.execute(
+            """SELECT COUNT(*),
+                      AVG(downtime_min) FILTER (WHERE status='완료' AND downtime_min > 0),
+                      MAX(recv_date)
+               FROM maintenance
+               WHERE tenant_id=%s AND equipment_code=%s""",
+            (tenant_id, equipment_code),
+        )
+        cnt, mttr, last_date = c.fetchone()
+        c.execute(
+            """SELECT AVG(gap) FROM (
+                   SELECT (recv_date::date - LAG(recv_date::date)
+                           OVER (ORDER BY recv_date::date)) AS gap
+                   FROM maintenance
+                   WHERE tenant_id=%s AND equipment_code=%s
+                     AND recv_date ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+               ) t WHERE gap IS NOT NULL""",
+            (tenant_id, equipment_code),
+        )
+        mtbf = c.fetchone()[0]
+    return {
+        "count": cnt or 0,
+        "mttr": round(float(mttr), 1) if mttr else 0,
+        "mtbf_days": round(float(mtbf), 1) if mtbf else 0,
+        "last_date": last_date or "-",
+    }
+
+
+def get_equipment_stats(equipment_code):
+    return _get_equipment_stats_q(_current_tenant(), equipment_code)
+
+
+
 # ─────────── Excel Import ───────────
 def import_from_excel(file_path: str) -> dict:
     results = {"equipment": 0, "maintenance": 0, "errors": []}
