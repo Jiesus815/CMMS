@@ -13,15 +13,10 @@ import hashlib
 from datetime import datetime, timedelta
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from utils.database import verify_login, get_user_by_id
 from utils.style import inject_css
-
-try:
-    import extra_streamlit_components as stx
-    _HAS_COOKIE = True
-except Exception:
-    _HAS_COOKIE = False
 
 _COOKIE_NAME = "cmms_auth"
 _TOKEN_DAYS = 7
@@ -74,15 +69,38 @@ def _read_token(token: str):
 
 
 def _cookie_manager():
-    """세션당 1개의 CookieManager 인스턴스. 없으면 None."""
-    if not _HAS_COOKIE:
+    """(하위호환용 유지) 더 이상 외부 컴포넌트를 쓰지 않는다."""
+    return None
+
+
+def _read_cookie_token():
+    """HTTP 요청 헤더에서 쿠키를 동기적으로 읽는다(새로고침 시 즉시 사용 가능)."""
+    try:
+        return st.context.cookies.get(_COOKIE_NAME)
+    except Exception:
         return None
-    if "_cookie_mgr" not in st.session_state:
-        try:
-            st.session_state["_cookie_mgr"] = stx.CookieManager(key="cmms_cookie_mgr")
-        except Exception:
-            st.session_state["_cookie_mgr"] = None
-    return st.session_state["_cookie_mgr"]
+
+
+def _write_cookie(token: str, days: int = _TOKEN_DAYS):
+    """srcdoc iframe(부모 도메인 상속)에서 document.cookie 로 쿠키 저장."""
+    max_age = days * 86400
+    try:
+        components.html(
+            f"<script>document.cookie='{_COOKIE_NAME}={token}; max-age={max_age}; path=/; SameSite=Lax';</script>",
+            height=0,
+        )
+    except Exception:
+        pass
+
+
+def _delete_cookie():
+    try:
+        components.html(
+            f"<script>document.cookie='{_COOKIE_NAME}=; max-age=0; path=/; SameSite=Lax';</script>",
+            height=0,
+        )
+    except Exception:
+        pass
 
 
 def current_user():
@@ -103,12 +121,7 @@ def is_superadmin() -> bool:
 
 def logout():
     st.session_state.pop("auth_user", None)
-    cm = st.session_state.get("_cookie_mgr")
-    if cm is not None:
-        try:
-            cm.delete(_COOKIE_NAME)
-        except Exception:
-            pass
+    _delete_cookie()
 
 
 def _login_form(cm=None):
@@ -137,12 +150,8 @@ def _login_form(cm=None):
             user = verify_login(username.strip(), password)
             if user:
                 st.session_state["auth_user"] = user
-                if keep and cm is not None:
-                    try:
-                        cm.set(_COOKIE_NAME, _make_token(user),
-                               expires_at=datetime.now() + timedelta(days=_TOKEN_DAYS))
-                    except Exception:
-                        pass
+                if keep:
+                    _write_cookie(_make_token(user))
                 st.rerun()
             else:
                 st.error("아이디 또는 비밀번호가 올바르지 않거나 비활성 계정입니다.")
@@ -156,15 +165,8 @@ def require_login():
     if current_user():
         return
 
-    cm = _cookie_manager()
-
-    # 쿠키에서 자동 로그인 복원 시도
-    token = None
-    if cm is not None:
-        try:
-            token = cm.get(_COOKIE_NAME)
-        except Exception:
-            token = None
+    # 쿠키에서 자동 로그인 복원 시도 (요청 헤더 기반, 동기적)
+    token = _read_cookie_token()
     if token:
         payload = _read_token(token)
         if payload:
@@ -173,5 +175,5 @@ def require_login():
                 st.session_state["auth_user"] = user
                 return
 
-    _login_form(cm)
+    _login_form()
     st.stop()
