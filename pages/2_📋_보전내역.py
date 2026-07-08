@@ -75,21 +75,30 @@ tab1, tab2 = st.tabs(["📋 목록 조회", "➕ 신규 등록"])
 # 탭1: 목록 조회
 # ══════════════════════════════
 with tab1:
-    # 필터
-    fc1, fc2, fc3, fc4, fc5, fc6 = st.columns([2, 2, 1.5, 1, 2, 1])
-    with fc1:
-        f_factory = st.selectbox("팭토리", ["전체"] + FACTORIES, key="f_fac")
-    with fc2:
-        f_status = st.selectbox("진행상태", ["전체"] + STATUS_LIST, key="f_st")
-    with fc3:
-        f_year = st.selectbox("연도", ["전체"] + get_available_years(), key="f_yr")
-    with fc4:
-        f_month = st.selectbox("월", ["전체"] + list(range(1, 13)), key="f_mo")
-    with fc5:
-        f_assignee = st.text_input("담당자", key="f_asg", placeholder="이름 검색")
-    with fc6:
-        st.markdown("<br>", unsafe_allow_html=True)
-        btn_search = st.button("🔍 조회", use_container_width=True)
+    # 검색 · 필터 (팝오버로 분리해 화면을 깔끔하게)
+    with st.popover("🔍 검색 · 필터", use_container_width=False):
+        pf1, pf2 = st.columns(2)
+        with pf1:
+            f_factory = st.selectbox("팩토리", ["전체"] + FACTORIES, key="f_fac")
+            f_year = st.selectbox("연도", ["전체"] + get_available_years(), key="f_yr")
+            f_assignee = st.text_input("담당자", key="f_asg", placeholder="이름 검색")
+        with pf2:
+            f_status = st.selectbox("진행상태", ["전체"] + STATUS_LIST, key="f_st")
+            f_month = st.selectbox("월", ["전체"] + list(range(1, 13)), key="f_mo")
+
+    # 적용된 필터 요약
+    _active = []
+    if f_factory != "전체":
+        _active.append(f_factory)
+    if f_status != "전체":
+        _active.append(f_status)
+    if f_year != "전체":
+        _active.append(f"{f_year}년")
+    if f_month != "전체":
+        _active.append(f"{f_month}월")
+    if f_assignee.strip():
+        _active.append(f"담당:{f_assignee.strip()}")
+    st.caption("적용 필터: " + (" · ".join(_active) if _active else "전체"))
 
     df = get_maintenance(
         factory=None if f_factory == "전체" else f_factory,
