@@ -1,6 +1,9 @@
 import os
 import psycopg2
 import pandas as pd
+import hashlib
+import base64
+import hmac
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -9,6 +12,27 @@ try:
     DATABASE_URL = st.secrets["DATABASE_URL"]
 except Exception:
     DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+
+# ─────────── 비밀번호 해싱 (표준 라이브러리 pbkdf2) ───────────
+def hash_password(password: str, iterations: int = 200_000) -> str:
+    """pbkdf2-sha256 해시 문자열 생성 (salt 포함). 평문은 절대 저장하지 않음."""
+    salt = os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return f"pbkdf2_sha256${iterations}${base64.b64encode(salt).decode()}${base64.b64encode(dk).decode()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """저장된 해시와 평문 비밀번호 비교 (타이밍 안전)."""
+    try:
+        algo, iters, salt_b64, hash_b64 = stored.split("$")
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(hash_b64)
+        dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iters))
+        return hmac.compare_digest(dk, expected)
+    except Exception:
+        return False
+
 
 
 def get_conn():
@@ -186,10 +210,58 @@ def init_db():
         )
     """)
 
+    # 테넌트(회사) 테이블 — 멀티테넌시 기반 (현재는 단일 테넌트로 운영)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS tenant (
+            id SERIAL PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    c.execute("INSERT INTO tenant (id, name) VALUES (1, '기본') ON CONFLICT DO NOTHING")
+
+    # 사용자 계정 테이블 (관리자가 계정 생성, 자유가입 없음)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS app_user (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            display_name TEXT,
+            role TEXT DEFAULT 'user',
+            tenant_id INTEGER REFERENCES tenant(id) DEFAULT 1,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_by TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            last_login TIMESTAMPTZ
+        )
+    """)
+
     conn.commit()
     _seed_issue_codes(c, conn)
     _seed_holidays_2026(c, conn)
+    _seed_admin(c, conn)
     conn.close()
+
+
+def _seed_admin(c, conn):
+    """최초 실행 시 최고관리자 계정 1개 생성 (부트스트랩).
+    secrets [admin] username/password 사용, 없으면 기본값(admin/admin1234)."""
+    c.execute("SELECT COUNT(*) FROM app_user WHERE role='superadmin'")
+    if c.fetchone()[0] > 0:
+        return
+    try:
+        admin_user = st.secrets["admin"]["username"]
+        admin_pw = st.secrets["admin"]["password"]
+    except Exception:
+        admin_user = "admin"
+        admin_pw = "admin1234"
+    c.execute(
+        "INSERT INTO app_user (username, password_hash, display_name, role, tenant_id, created_by) "
+        "VALUES (%s,%s,%s,'superadmin',1,'system') ON CONFLICT (username) DO NOTHING",
+        (admin_user, hash_password(admin_pw), "최고관리자"),
+    )
+    conn.commit()
+
 
 
 def _seed_issue_codes(c, conn):
@@ -927,3 +999,74 @@ def delete_work_log(log_id: int):
     """작업일지 삭제."""
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM work_log WHERE id=%s", (log_id,))
+
+
+# ─────────── 사용자 계정 CRUD ───────────
+def verify_login(username: str, password: str):
+    """로그인 검증. 성공 시 사용자 dict, 실패 시 None."""
+    with db_cursor() as (conn, c):
+        c.execute(
+            "SELECT id, username, password_hash, display_name, role, tenant_id, is_active "
+            "FROM app_user WHERE username=%s",
+            (username,),
+        )
+        row = c.fetchone()
+    if not row or not row[6]:  # 없거나 비활성
+        return None
+    if not verify_password(password, row[2]):
+        return None
+    try:
+        with db_cursor(commit=True) as (conn, c):
+            c.execute("UPDATE app_user SET last_login=NOW() WHERE id=%s", (row[0],))
+    except Exception:
+        pass
+    return {"id": row[0], "username": row[1], "display_name": row[3],
+            "role": row[4], "tenant_id": row[5]}
+
+
+def list_users(tenant_id=None):
+    q = ("SELECT id, username, display_name, role, tenant_id, is_active, last_login, created_at "
+         "FROM app_user")
+    params = []
+    if tenant_id:
+        q += " WHERE tenant_id=%s"
+        params.append(tenant_id)
+    q += " ORDER BY role, username"
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=params if params else None)
+
+
+def create_user(username: str, password: str, display_name: str,
+                role: str = "user", tenant_id: int = 1, created_by: str = "") -> bool:
+    """계정 생성. 중복 아이디면 False."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("SELECT 1 FROM app_user WHERE username=%s", (username,))
+        if c.fetchone():
+            return False
+        c.execute(
+            "INSERT INTO app_user (username, password_hash, display_name, role, tenant_id, created_by) "
+            "VALUES (%s,%s,%s,%s,%s,%s)",
+            (username, hash_password(password), display_name, role, tenant_id, created_by),
+        )
+        return True
+
+
+def delete_user(user_id: int):
+    """계정 삭제 (최고관리자는 삭제 불가)."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM app_user WHERE id=%s AND role<>'superadmin'", (user_id,))
+
+
+def reset_user_password(user_id: int, new_password: str):
+    """비밀번호 초기화."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("UPDATE app_user SET password_hash=%s WHERE id=%s",
+                  (hash_password(new_password), user_id))
+
+
+def set_user_active(user_id: int, active: bool):
+    """계정 활성/비활성 (최고관리자는 변경 불가)."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("UPDATE app_user SET is_active=%s WHERE id=%s AND role<>'superadmin'",
+                  (active, user_id))
+
