@@ -13,10 +13,15 @@ import hashlib
 from datetime import datetime, timedelta
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from utils.database import verify_login, get_user_by_id
 from utils.style import inject_css
+
+try:
+    from streamlit_cookies_controller import CookieController
+    _HAS_COOKIE = True
+except Exception:
+    _HAS_COOKIE = False
 
 _COOKIE_NAME = "cmms_auth"
 _TOKEN_DAYS = 7
@@ -69,13 +74,29 @@ def _read_token(token: str):
         return None
 
 
-def _cookie_manager():
-    """(하위호환용 유지) 더 이상 외부 컴포넌트를 쓰지 않는다."""
-    return None
+def _controller():
+    """세션당 1개의 CookieController. 라이브러리 없으면 None."""
+    if not _HAS_COOKIE:
+        return None
+    if "_cookie_ctrl" not in st.session_state:
+        try:
+            st.session_state["_cookie_ctrl"] = CookieController()
+        except Exception:
+            st.session_state["_cookie_ctrl"] = None
+    return st.session_state["_cookie_ctrl"]
 
 
 def _read_cookie_token():
-    """HTTP 요청 헤더에서 쿠키를 동기적으로 읽는다(새로고침 시 즉시 사용 가능)."""
+    """저장된 로그인 토큰 쿠키를 읽는다."""
+    ctrl = _controller()
+    if ctrl is not None:
+        try:
+            v = ctrl.get(_COOKIE_NAME)
+            if v:
+                return v
+        except Exception:
+            pass
+    # 폴백: Streamlit 내장 쿠키 읽기
     try:
         return st.context.cookies.get(_COOKIE_NAME)
     except Exception:
@@ -83,26 +104,21 @@ def _read_cookie_token():
 
 
 def _write_cookie(token: str, days: int = _TOKEN_DAYS):
-    """srcdoc iframe(부모 도메인 상속)에서 document.cookie 로 쿠키 저장."""
-    max_age = days * 86400
+    ctrl = _controller()
+    if ctrl is None:
+        return
     try:
-        components.html(
-            "<script>var c='{n}={t}; max-age={m}; path=/; SameSite=Lax';"
-            "try{{window.parent.document.cookie=c+'; Secure';}}"
-            "catch(e){{document.cookie=c;}}</script>".format(n=_COOKIE_NAME, t=token, m=max_age),
-            height=0,
-        )
+        ctrl.set(_COOKIE_NAME, token, max_age=days * 86400, path="/", same_site="lax")
     except Exception:
         pass
 
 
 def _delete_cookie():
+    ctrl = _controller()
+    if ctrl is None:
+        return
     try:
-        components.html(
-            "<script>var c='{n}=; max-age=0; path=/; SameSite=Lax';"
-            "try{{window.parent.document.cookie=c;}}catch(e){{document.cookie=c;}}</script>".format(n=_COOKIE_NAME),
-            height=0,
-        )
+        ctrl.remove(_COOKIE_NAME)
     except Exception:
         pass
 
