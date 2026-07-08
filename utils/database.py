@@ -250,6 +250,23 @@ def init_db():
         )
     """)
 
+    # 예방보전(PM) 스케줄 테이블
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS pm_schedule (
+            id SERIAL PRIMARY KEY,
+            tenant_id INTEGER DEFAULT 1,
+            equipment_code TEXT,
+            equipment_name TEXT,
+            title TEXT,
+            interval_days INTEGER DEFAULT 30,
+            last_done TEXT,
+            next_due TEXT,
+            memo TEXT,
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     # ── 멀티테넌시 마이그레이션: 운영 테이블에 tenant_id 부여 (멱등) ──
     # 기존 행은 DEFAULT 1 로 자동 backfill 되어 '기본' 테넌트에 귀속된다.
     for _tbl in ("equipment", "maintenance", "work_log", "slack_requests", "slack_unmatched"):
@@ -855,6 +872,82 @@ def _get_equipment_stats_q(tenant_id, equipment_code):
 
 def get_equipment_stats(equipment_code):
     return _get_equipment_stats_q(_current_tenant(), equipment_code)
+
+
+# ─────────── 예방보전(PM) 스케줄 CRUD ───────────
+def _add_days(date_str: str, days: int) -> str:
+    from datetime import datetime as _dt, timedelta as _td
+    try:
+        return (_dt.strptime(date_str, "%Y-%m-%d") + _td(days=int(days))).strftime("%Y-%m-%d")
+    except Exception:
+        return date_str
+
+
+def add_pm(data: dict):
+    from datetime import datetime as _dt
+    interval = int(data.get("interval_days") or 30)
+    last_done = data.get("last_done") or _dt.now().strftime("%Y-%m-%d")
+    next_due = _add_days(last_done, interval)
+    with db_cursor(commit=True) as (conn, c):
+        c.execute(
+            "INSERT INTO pm_schedule (tenant_id, equipment_code, equipment_name, title, "
+            "interval_days, last_done, next_due, memo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (_current_tenant(), data.get("equipment_code"), data.get("equipment_name"),
+             data.get("title"), interval, last_done, next_due, data.get("memo")),
+        )
+    log_audit("등록", "예방보전", data.get("equipment_code", ""), data.get("title", ""))
+
+
+@st.cache_data(ttl=120)
+def _get_pm_list_q(tenant_id, active_only=True):
+    q = ("SELECT id, equipment_code, equipment_name, title, interval_days, "
+         "last_done, next_due, memo, active FROM pm_schedule WHERE tenant_id=%s")
+    if active_only:
+        q += " AND active=TRUE"
+    q += " ORDER BY next_due ASC NULLS LAST, id DESC"
+    with db_connection() as conn:
+        return pd.read_sql_query(q, conn, params=[tenant_id])
+
+
+def get_pm_list(active_only=True):
+    return _get_pm_list_q(_current_tenant(), active_only)
+
+
+def mark_pm_done(pm_id: int, done_date: str = None):
+    from datetime import datetime as _dt
+    done = done_date or _dt.now().strftime("%Y-%m-%d")
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("SELECT interval_days FROM pm_schedule WHERE id=%s AND tenant_id=%s",
+                  (pm_id, _current_tenant()))
+        row = c.fetchone()
+        interval = int(row[0]) if row and row[0] else 30
+        next_due = _add_days(done, interval)
+        c.execute("UPDATE pm_schedule SET last_done=%s, next_due=%s WHERE id=%s AND tenant_id=%s",
+                  (done, next_due, pm_id, _current_tenant()))
+    log_audit("완료처리", "예방보전", pm_id)
+
+
+def delete_pm(pm_id: int):
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM pm_schedule WHERE id=%s AND tenant_id=%s", (pm_id, _current_tenant()))
+    log_audit("삭제", "예방보전", pm_id)
+
+
+def get_pm_due_count(within_days: int = 7) -> int:
+    """마감 임박(오늘~within_days 이내) PM 건수. 대시보드 알림용."""
+    from datetime import datetime as _dt, timedelta as _td
+    limit = (_dt.now() + _td(days=within_days)).strftime("%Y-%m-%d")
+    try:
+        with db_cursor() as (conn, c):
+            c.execute(
+                "SELECT COUNT(*) FROM pm_schedule WHERE tenant_id=%s AND active=TRUE "
+                "AND next_due IS NOT NULL AND next_due<=%s",
+                (_current_tenant(), limit),
+            )
+            return c.fetchone()[0] or 0
+    except Exception:
+        return 0
+
 
 
 

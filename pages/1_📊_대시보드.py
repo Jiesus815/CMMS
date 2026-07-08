@@ -2,7 +2,7 @@ import streamlit as st
 import sys, os
 import html
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, get_available_years, init_db
+from utils.database import get_kpi, get_monthly_count, get_factory_count, get_issue_top, get_overdue, get_available_years, get_pm_due_count, init_db
 from utils.style import inject_css, page_header, kpi_cards, chart_title, style_plotly, IRIS, GOLD, CHART_SEQ, CHART_GRAD
 import plotly.express as px
 import plotly.graph_objects as go
@@ -34,6 +34,10 @@ kpi_cards([
     {"label": "처리율",       "value": f"{kpi['rate']}%",      "icon": "📈", "color": "purple", "sub": "목표 95%"},
     {"label": "평균 고장시간","value": f"{kpi['avg_down']}분", "icon": "⏱️", "color": "red",    "sub": "분 단위"},
 ])
+
+_pm_due = get_pm_due_count(7)
+if _pm_due:
+    st.warning(f"🗓️ 예방보전 마감 임박 **{_pm_due}건** (7일 이내). '예방보전' 페이지에서 확인하세요.")
 
 st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
