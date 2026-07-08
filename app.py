@@ -44,6 +44,7 @@ nav = {
     ],
     "설비 관리": [
         st.Page(os.path.join(_PAGES, "3_⚙️_설비Overview.py"), title="설비 목록", icon="🏭"),
+        st.Page(os.path.join(_PAGES, "10_🧰_부품재고.py"), title="부품 재고", icon="🧰"),
     ],
     "시스템": [
         st.Page(os.path.join(_PAGES, "5_🏷️_이슈코드.py"), title="이슈코드", icon="🏷️"),

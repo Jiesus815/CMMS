@@ -267,6 +267,22 @@ def init_db():
         )
     """)
 
+    # 부품 재고 테이블
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS part_inventory (
+            id SERIAL PRIMARY KEY,
+            tenant_id INTEGER DEFAULT 1,
+            part_code TEXT,
+            part_name TEXT,
+            stock INTEGER DEFAULT 0,
+            min_stock INTEGER DEFAULT 0,
+            unit TEXT,
+            location TEXT,
+            memo TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     # ── 멀티테넌시 마이그레이션: 운영 테이블에 tenant_id 부여 (멱등) ──
     # 기존 행은 DEFAULT 1 로 자동 backfill 되어 '기본' 테넌트에 귀속된다.
     for _tbl in ("equipment", "maintenance", "work_log", "slack_requests", "slack_unmatched"):
@@ -947,6 +963,73 @@ def get_pm_due_count(within_days: int = 7) -> int:
             return c.fetchone()[0] or 0
     except Exception:
         return 0
+
+
+# ─────────── 부품 재고 CRUD ───────────
+def add_part(data: dict):
+    tid = _current_tenant()
+    with db_cursor(commit=True) as (conn, c):
+        if data.get("id"):
+            c.execute(
+                "UPDATE part_inventory SET part_code=%s, part_name=%s, stock=%s, "
+                "min_stock=%s, unit=%s, location=%s, memo=%s WHERE id=%s AND tenant_id=%s",
+                (data.get("part_code"), data.get("part_name"), int(data.get("stock") or 0),
+                 int(data.get("min_stock") or 0), data.get("unit"), data.get("location"),
+                 data.get("memo"), data["id"], tid),
+            )
+        else:
+            c.execute(
+                "INSERT INTO part_inventory (tenant_id, part_code, part_name, stock, "
+                "min_stock, unit, location, memo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (tid, data.get("part_code"), data.get("part_name"), int(data.get("stock") or 0),
+                 int(data.get("min_stock") or 0), data.get("unit"), data.get("location"),
+                 data.get("memo")),
+            )
+    log_audit("등록/수정", "부품", data.get("part_code", ""), data.get("part_name", ""))
+
+
+def adjust_part_stock(part_id: int, delta: int):
+    with db_cursor(commit=True) as (conn, c):
+        c.execute(
+            "UPDATE part_inventory SET stock=GREATEST(0, stock + %s) WHERE id=%s AND tenant_id=%s",
+            (int(delta), part_id, _current_tenant()),
+        )
+    log_audit("입출고", "부품", part_id, f"{'+' if delta >= 0 else ''}{delta}")
+
+
+@st.cache_data(ttl=120)
+def _get_parts_q(tenant_id):
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT id, part_code, part_name, stock, min_stock, unit, location, memo "
+            "FROM part_inventory WHERE tenant_id=%s ORDER BY part_name, part_code",
+            conn, params=[tenant_id],
+        )
+
+
+def get_parts():
+    return _get_parts_q(_current_tenant())
+
+
+def delete_part(part_id: int):
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("DELETE FROM part_inventory WHERE id=%s AND tenant_id=%s",
+                  (part_id, _current_tenant()))
+    log_audit("삭제", "부품", part_id)
+
+
+def get_low_stock_count() -> int:
+    try:
+        with db_cursor() as (conn, c):
+            c.execute(
+                "SELECT COUNT(*) FROM part_inventory WHERE tenant_id=%s "
+                "AND min_stock > 0 AND stock <= min_stock",
+                (_current_tenant(),),
+            )
+            return c.fetchone()[0] or 0
+    except Exception:
+        return 0
+
 
 
 
