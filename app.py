@@ -15,7 +15,15 @@ st.set_page_config(
 )
 
 # ─── DB 초기화 ───
-init_db()
+try:
+    init_db()
+except Exception as _e:
+    st.error("⚠️ 데이터베이스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.")
+    if st.button("🔄 다시 시도"):
+        st.rerun()
+    with st.expander("기술 상세 정보"):
+        st.exception(_e)
+    st.stop()
 
 # ─── 로그인 게이트 (AUTH_ENABLED 활성 시) ───
 require_login()
@@ -54,4 +62,11 @@ if _u:
             logout()
             st.rerun()
 
-pg.run()
+try:
+    pg.run()
+except Exception as _e:
+    st.error("⚠️ 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.")
+    if st.button("🔄 다시 시도", key="_retry_page"):
+        st.rerun()
+    with st.expander("기술 상세 정보"):
+        st.exception(_e)

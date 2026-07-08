@@ -120,9 +120,10 @@ def match_equipment(equipment_text: str | None) -> bool:
     try:
         conn = get_conn()
         c = conn.cursor()
+        from utils.database import _current_tenant
         c.execute(
-            "SELECT COUNT(*) FROM equipment WHERE equipment_name ILIKE %s OR equipment_code ILIKE %s",
-            (f"%{equipment_text}%", f"%{equipment_text}%"),
+            "SELECT COUNT(*) FROM equipment WHERE tenant_id=%s AND (equipment_name ILIKE %s OR equipment_code ILIKE %s)",
+            (_current_tenant(), f"%{equipment_text}%", f"%{equipment_text}%"),
         )
         count = c.fetchone()[0]
         conn.close()
