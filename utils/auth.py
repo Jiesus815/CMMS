@@ -107,10 +107,18 @@ def _write_cookie(token: str, days: int = _TOKEN_DAYS):
     ctrl = _controller()
     if ctrl is None:
         return
-    try:
-        ctrl.set(_COOKIE_NAME, token, max_age=days * 86400, path="/", same_site="lax")
-    except Exception:
-        pass
+    from datetime import datetime, timedelta
+    # 옵션 인자가 버전마다 다를 수 있어 단계적으로 시도(실패해도 최소한 세션쿠키는 저장)
+    for _kw in (
+        {"expires": datetime.now() + timedelta(days=days)},
+        {"max_age": days * 86400},
+        {},
+    ):
+        try:
+            ctrl.set(_COOKIE_NAME, token, **_kw)
+            return
+        except Exception:
+            continue
 
 
 def _delete_cookie():
@@ -164,12 +172,14 @@ def _login_form(cm=None):
         with st.form("login_form"):
             username = st.text_input("아이디")
             password = st.text_input("비밀번호", type="password")
+            keep = st.checkbox("로그인 유지 (새로고침해도 유지)", value=True)
             ok = st.form_submit_button("로그인", use_container_width=True, type="primary")
         if ok:
             user = verify_login(username.strip(), password)
             if user:
                 st.session_state["auth_user"] = user
-                _write_cookie(_make_token(user))
+                if keep:
+                    _write_cookie(_make_token(user))
                 st.rerun()
             else:
                 st.error("아이디 또는 비밀번호가 올바르지 않거나 비활성 계정입니다.")
