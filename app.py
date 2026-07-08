@@ -3,7 +3,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(__file__))
-from utils.database import init_db
+from utils.database import init_db, change_own_password
 from utils.auth import require_login, current_user, logout
 
 # ─── 페이지 기본 설정 (진입점에서 1회만) ───
@@ -58,6 +58,21 @@ if _u:
         st.markdown("---")
         _role_label = {"superadmin": "최고관리자", "admin": "관리자", "user": "일반"}.get(_u.get("role"), _u.get("role"))
         st.caption(f"👤 {_u.get('display_name') or _u.get('username')} · {_role_label}")
+        with st.expander("🔑 내 비밀번호 변경"):
+            _cur = st.text_input("현재 비밀번호", type="password", key="_pw_cur")
+            _new = st.text_input("새 비밀번호", type="password", key="_pw_new")
+            _new2 = st.text_input("새 비밀번호 확인", type="password", key="_pw_new2")
+            if st.button("변경", use_container_width=True, key="_pw_btn"):
+                if not _cur or not _new:
+                    st.warning("비밀번호를 입력하세요.")
+                elif _new != _new2:
+                    st.warning("새 비밀번호가 일치하지 않습니다.")
+                elif len(_new) < 8:
+                    st.warning("새 비밀번호는 8자 이상이어야 합니다.")
+                elif change_own_password(int(_u["id"]), _cur, _new):
+                    st.success("변경되었습니다.")
+                else:
+                    st.error("현재 비밀번호가 틀렸습니다.")
         if st.button("로그아웃", use_container_width=True):
             logout()
             st.rerun()

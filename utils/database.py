@@ -236,6 +236,20 @@ def init_db():
         )
     """)
 
+    # 감사 로그 테이블 (누가·언제·무엇을 변경했는지 추적)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id SERIAL PRIMARY KEY,
+            tenant_id INTEGER DEFAULT 1,
+            actor TEXT,
+            action TEXT,
+            entity TEXT,
+            entity_id TEXT,
+            detail TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     # ── 멀티테넌시 마이그레이션: 운영 테이블에 tenant_id 부여 (멱등) ──
     # 기존 행은 DEFAULT 1 로 자동 backfill 되어 '기본' 테넌트에 귀속된다.
     for _tbl in ("equipment", "maintenance", "work_log", "slack_requests", "slack_unmatched"):
@@ -416,11 +430,13 @@ def upsert_equipment(data: dict):
             """, (data["factory"], data["equipment_code"], data["equipment_name"],
                   data.get("location"), data.get("category"), data.get("status","정상"),
                   data.get("install_date"), data.get("memo"), tid))
+    log_audit("등록/수정", "설비", data.get("equipment_code",""), data.get("equipment_name",""))
 
 
 def delete_equipment(eq_id: int):
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM equipment WHERE id=%s AND tenant_id=%s", (eq_id, _current_tenant()))
+    log_audit("삭제", "설비", eq_id)
 
 
 
@@ -518,6 +534,7 @@ def insert_maintenance(data: dict, conn=None):
     if own:
         conn.commit()
         conn.close()
+        log_audit("등록", "보전내역", eq_code or "", f"{data.get('factory','')} · {(data.get('issue_desc') or '')[:50]}")
 
 
 def _sync_equipment_status(conn, equipment_code: str, maint_status: str, commit: bool = True, tenant_id: int = 1):
@@ -579,11 +596,13 @@ def update_maintenance(m_id: int, data: dict):
         status = data.get("status")
         if eq_code and status:
             _sync_equipment_status(conn, eq_code, status, commit=False, tenant_id=tid)
+    log_audit("수정", "보전내역", m_id, f"{data.get('equipment_code','')} · {data.get('status','')}")
 
 
 def delete_maintenance(m_id: int):
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM maintenance WHERE id=%s AND tenant_id=%s", (m_id, _current_tenant()))
+    log_audit("삭제", "보전내역", m_id)
 
 
 
@@ -890,6 +909,10 @@ def import_from_excel(file_path: str) -> dict:
     except Exception as e:
         results["errors"].append(str(e))
 
+    if results["equipment"] or results["maintenance"]:
+        log_audit("엑셀임포트", "데이터", "",
+                  f"설비 {results['equipment']}건 · 보전 {results['maintenance']}건")
+
     return results
 
 
@@ -1017,6 +1040,7 @@ def clear_maintenance():
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM maintenance WHERE tenant_id=%s", (tid,))
         c.execute("UPDATE equipment SET status='정상' WHERE tenant_id=%s", (tid,))
+    log_audit("초기화", "보전내역", "", "보전내역 전체 삭제")
 
 
 def clear_all_data():
@@ -1027,6 +1051,7 @@ def clear_all_data():
         c.execute("DELETE FROM slack_requests WHERE tenant_id=%s", (tid,))
         c.execute("DELETE FROM maintenance WHERE tenant_id=%s", (tid,))
         c.execute("DELETE FROM equipment WHERE tenant_id=%s", (tid,))
+    log_audit("전체초기화", "데이터", "", "보전내역·설비·슬랙 전체 삭제")
 
 
 # ─────────── 작업일지 CRUD ───────────
@@ -1040,6 +1065,7 @@ def add_work_log(data: dict):
             data.get("log_date"), data.get("author"), data.get("factory"),
             data.get("category"), data.get("title"), data.get("content"), _current_tenant(),
         ))
+    log_audit("작성", "작업일지", "", (data.get("title") or "")[:50])
 
 
 @st.cache_data(ttl=300)
@@ -1072,6 +1098,7 @@ def delete_work_log(log_id: int):
     """작업일지 삭제."""
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM work_log WHERE id=%s AND tenant_id=%s", (log_id, _current_tenant()))
+    log_audit("삭제", "작업일지", log_id)
 
 
 # ─────────── 사용자 계정 CRUD ───────────
@@ -1121,6 +1148,7 @@ def create_user(username: str, password: str, display_name: str,
             "VALUES (%s,%s,%s,%s,%s,%s)",
             (username, hash_password(password), display_name, role, tenant_id, created_by),
         )
+        log_audit("계정생성", "계정", username, f"권한={role}")
         return True
 
 
@@ -1128,6 +1156,7 @@ def delete_user(user_id: int):
     """계정 삭제 (최고관리자는 삭제 불가)."""
     with db_cursor(commit=True) as (conn, c):
         c.execute("DELETE FROM app_user WHERE id=%s AND role<>'superadmin'", (user_id,))
+    log_audit("계정삭제", "계정", user_id)
 
 
 def reset_user_password(user_id: int, new_password: str):
@@ -1142,4 +1171,84 @@ def set_user_active(user_id: int, active: bool):
     with db_cursor(commit=True) as (conn, c):
         c.execute("UPDATE app_user SET is_active=%s WHERE id=%s AND role<>'superadmin'",
                   (active, user_id))
+
+
+def change_own_password(user_id: int, old_password: str, new_password: str) -> bool:
+    """본인 비밀번호 변경. 기존 비번이 맞아야 True."""
+    with db_cursor() as (conn, c):
+        c.execute("SELECT password_hash FROM app_user WHERE id=%s", (user_id,))
+        row = c.fetchone()
+    if not row or not verify_password(old_password, row[0]):
+        return False
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("UPDATE app_user SET password_hash=%s WHERE id=%s",
+                  (hash_password(new_password), user_id))
+    return True
+
+
+def set_user_tenant(user_id: int, tenant_id: int):
+    """사용자를 특정 테넌트(회사)에 배정 (최고관리자 제외)."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("UPDATE app_user SET tenant_id=%s WHERE id=%s AND role<>'superadmin'",
+                  (tenant_id, user_id))
+
+
+# ─────────── 테넌트(회사) CRUD ───────────
+def list_tenants():
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT t.id, t.name, t.created_at, "
+            "(SELECT COUNT(*) FROM app_user u WHERE u.tenant_id=t.id) AS user_count "
+            "FROM tenant t ORDER BY t.id",
+            conn,
+        )
+
+
+def create_tenant(name: str) -> bool:
+    """회사(테넌트) 생성. 중복 이름이면 False."""
+    with db_cursor(commit=True) as (conn, c):
+        c.execute("SELECT 1 FROM tenant WHERE name=%s", (name,))
+        if c.fetchone():
+            return False
+        c.execute("INSERT INTO tenant (name) VALUES (%s)", (name,))
+        return True
+
+
+# ─────────── 감사 로그 ───────────
+def _current_actor() -> str:
+    try:
+        u = st.session_state.get("auth_user")
+        if u:
+            return u.get("username") or "-"
+    except Exception:
+        pass
+    return "system"
+
+
+def log_audit(action: str, entity: str, entity_id="", detail: str = ""):
+    """감사 로그 1건 기록. 실패해도 본작업에 영향 주지 않도록 조용히 무시."""
+    try:
+        with db_cursor(commit=True) as (conn, c):
+            c.execute(
+                "INSERT INTO audit_log (tenant_id, actor, action, entity, entity_id, detail) "
+                "VALUES (%s,%s,%s,%s,%s,%s)",
+                (_current_tenant(), _current_actor(), action, entity, str(entity_id), detail[:500]),
+            )
+    except Exception:
+        pass
+
+
+@st.cache_data(ttl=60)
+def _get_audit_logs_q(tenant_id, limit=300):
+    with db_connection() as conn:
+        return pd.read_sql_query(
+            "SELECT created_at, actor, action, entity, entity_id, detail "
+            "FROM audit_log WHERE tenant_id=%s ORDER BY id DESC LIMIT %s",
+            conn, params=[tenant_id, limit],
+        )
+
+
+def get_audit_logs(limit=300):
+    return _get_audit_logs_q(_current_tenant(), limit)
+
 
