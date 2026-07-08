@@ -75,8 +75,8 @@ tab1, tab2 = st.tabs(["📋 목록 조회", "➕ 신규 등록"])
 # 탭1: 목록 조회
 # ══════════════════════════════
 with tab1:
-    # 검색 · 필터 (팝오버로 분리해 화면을 깔끔하게)
-    with st.popover("🔍 검색 · 필터", use_container_width=False):
+    # 검색 (팝오버로 분리해 화면을 깔끔하게)
+    with st.popover("🔍 검색", use_container_width=False):
         pf1, pf2 = st.columns(2)
         with pf1:
             f_factory = st.selectbox("팩토리", ["전체"] + FACTORIES, key="f_fac")
@@ -98,7 +98,7 @@ with tab1:
         _active.append(f"{f_month}월")
     if f_assignee.strip():
         _active.append(f"담당:{f_assignee.strip()}")
-    st.caption("적용 필터: " + (" · ".join(_active) if _active else "전체"))
+    st.caption("검색: " + (" · ".join(_active) if _active else "전체"))
 
     df = get_maintenance(
         factory=None if f_factory == "전체" else f_factory,
