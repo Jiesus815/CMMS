@@ -292,6 +292,26 @@ def init_db():
     c.execute("ALTER TABLE equipment DROP CONSTRAINT IF EXISTS equipment_equipment_code_key")
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS equipment_tenant_code_uidx ON equipment (tenant_id, equipment_code)")
 
+    # ── 성능 인덱스: 자주 필터/정렬되는 컬럼 (데이터 증가 대비) ──
+    _idx = [
+        "CREATE INDEX IF NOT EXISTS idx_maint_tenant ON maintenance(tenant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_maint_tenant_year ON maintenance(tenant_id, recv_year)",
+        "CREATE INDEX IF NOT EXISTS idx_maint_tenant_factory ON maintenance(tenant_id, factory)",
+        "CREATE INDEX IF NOT EXISTS idx_maint_tenant_status ON maintenance(tenant_id, status)",
+        "CREATE INDEX IF NOT EXISTS idx_maint_tenant_eqcode ON maintenance(tenant_id, equipment_code)",
+        "CREATE INDEX IF NOT EXISTS idx_equip_tenant ON equipment(tenant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_worklog_tenant_date ON work_log(tenant_id, log_date)",
+        "CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log(tenant_id, id)",
+        "CREATE INDEX IF NOT EXISTS idx_pm_tenant_due ON pm_schedule(tenant_id, next_due)",
+        "CREATE INDEX IF NOT EXISTS idx_part_tenant ON part_inventory(tenant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_slackreq_tenant ON slack_requests(tenant_id)",
+    ]
+    for _q in _idx:
+        try:
+            c.execute(_q)
+        except Exception:
+            pass
+
     conn.commit()
     _seed_issue_codes(c, conn)
     _seed_holidays_2026(c, conn)
