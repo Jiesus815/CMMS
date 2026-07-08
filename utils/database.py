@@ -1124,6 +1124,21 @@ def verify_login(username: str, password: str):
             "role": row[4], "tenant_id": row[5]}
 
 
+def get_user_by_id(user_id: int):
+    """id로 활성 사용자 조회 (쿠키 세션 복원용). 없거나 비활성이면 None."""
+    with db_cursor() as (conn, c):
+        c.execute(
+            "SELECT id, username, display_name, role, tenant_id, is_active "
+            "FROM app_user WHERE id=%s",
+            (user_id,),
+        )
+        row = c.fetchone()
+    if not row or not row[5]:
+        return None
+    return {"id": row[0], "username": row[1], "display_name": row[2],
+            "role": row[3], "tenant_id": row[4]}
+
+
 def list_users(tenant_id=None):
     q = ("SELECT id, username, display_name, role, tenant_id, is_active, last_login, created_at "
          "FROM app_user")

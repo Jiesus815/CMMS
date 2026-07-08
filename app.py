@@ -33,19 +33,21 @@ require_login()
 _PAGES = os.path.join(os.path.dirname(__file__), "pages")
 
 nav = {
-    "현황": [
+    "홈": [
         st.Page(os.path.join(_PAGES, "1_📊_대시보드.py"), title="대시보드", icon="📊", default=True),
     ],
     "보전 관리": [
         st.Page(os.path.join(_PAGES, "2_📋_보전내역.py"), title="보전내역", icon="📋"),
-        st.Page(os.path.join(_PAGES, "4_📅_주차별현황.py"), title="주차별 현황", icon="📅"),
-        st.Page(os.path.join(_PAGES, "3_⚙️_설비Overview.py"), title="설비 현황", icon="🏭"),
         st.Page(os.path.join(_PAGES, "8_📝_작업일지.py"), title="작업일지", icon="📝"),
+        st.Page(os.path.join(_PAGES, "4_📅_주차별현황.py"), title="주차별 집계", icon="📅"),
     ],
-    "데이터 관리": [
+    "설비 관리": [
+        st.Page(os.path.join(_PAGES, "3_⚙️_설비Overview.py"), title="설비 목록", icon="🏭"),
+    ],
+    "시스템": [
         st.Page(os.path.join(_PAGES, "5_🏷️_이슈코드.py"), title="이슈코드", icon="🏷️"),
         st.Page(os.path.join(_PAGES, "7_💬_슬랙연동.py"), title="슬랙 연동", icon="💬"),
-        st.Page(os.path.join(_PAGES, "6_📁_데이터관리.py"), title="가져오기 · 초기화", icon="📁"),
+        st.Page(os.path.join(_PAGES, "6_📁_데이터관리.py"), title="시스템 관리", icon="⚙️"),
     ],
 }
 

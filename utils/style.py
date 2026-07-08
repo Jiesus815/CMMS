@@ -293,6 +293,49 @@ hr { border: none; height: 1px; background: var(--hair) !important; }
 ::-webkit-scrollbar-thumb { background: rgba(156,151,140,.4); border-radius:999px; border:3px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: var(--tx3); background-clip: padding-box; }
 
+/* ── 마감 폴리시 ── */
+.stButton > button:active { transform: translateY(1px); }
+.stButton > button:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
+.stButton > button[kind="primary"] { letter-spacing:.01em; }
+.chart-title { position: relative; }
+[data-testid="stMetric"] { transition: box-shadow .28s var(--ease), transform .28s var(--ease); }
+[data-testid="stMetric"]:hover { transform: translateY(-3px); box-shadow: var(--sh-md); }
+.stTabs [data-baseweb="tab"] { transition: color .18s var(--ease), background .18s var(--ease); }
+.rec-fac, .badge { transition: filter .18s var(--ease); }
+[data-testid="stSidebarNav"] a { border-radius: 9px; transition: background .16s var(--ease); }
+[data-testid="stSidebarNav"] a:hover { background: rgba(110,98,230,.08); }
+.kpi-card, .rec-card, .eq-card { will-change: transform; }
+[data-testid="stExpander"] { border-radius: var(--r-md); overflow: hidden; }
+
+/* ── 반응형: 태블릿 ── */
+@media (max-width: 820px) {
+    .ah-title { font-size: 2.1rem; }
+    .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── 반응형: 모바일 ── */
+@media (max-width: 640px) {
+    .main .block-container { padding: 1.3rem .7rem 2rem; }
+    .ah-title { font-size: 1.85rem; }
+    .ah-emoji { width:28px; height:28px; font-size:14px; }
+    .kpi-grid { gap: 10px; margin-bottom: 16px; }
+    .kpi-grid-3, .kpi-grid-4, .kpi-grid-5 { grid-template-columns: repeat(2, 1fr); }
+    .kpi-card { padding: 14px 15px 13px; }
+    .kpi-val { font-size: 25px; margin-top: 10px; }
+    .kpi-sub { margin-top: 7px; }
+    .rec-grid { grid-template-columns: 1fr; }
+    .rec-scroll { max-height: none; }
+    .rec-meta { gap: 4px 11px; }
+    .stTabs [data-baseweb="tab"] { padding: 7px 11px; font-size: .8rem; }
+    [data-testid="stAppViewContainer"]::after { display: none; }  /* 모바일 성능: 그레인 제거 */
+}
+
+@media (max-width: 400px) {
+    .kpi-grid-3, .kpi-grid-4, .kpi-grid-5 { grid-template-columns: 1fr; }
+    .ah-title { font-size: 1.7rem; }
+}
+
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation:none !important; transition:none !important; } }
 """
 
