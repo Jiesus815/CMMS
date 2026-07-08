@@ -4,7 +4,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 from utils.database import init_db, change_own_password
-from utils.auth import require_login, current_user, logout
+from utils.auth import require_login, current_user, logout, auth_enabled
 
 # ─── 페이지 기본 설정 (진입점에서 1회만) ───
 st.set_page_config(
@@ -57,11 +57,28 @@ pg = st.navigation(nav)
 
 # ─── 사이드바: 로그인 사용자 표시 · 로그아웃 ───
 _u = current_user()
-if _u:
-    with st.sidebar:
-        st.markdown("---")
+with st.sidebar:
+    st.markdown("---")
+    if _u:
         _role_label = {"superadmin": "최고관리자", "admin": "관리자", "user": "일반"}.get(_u.get("role"), _u.get("role"))
-        st.caption(f"👤 {_u.get('display_name') or _u.get('username')} · {_role_label}")
+        _name = _u.get("display_name") or _u.get("username")
+        _rc = {"superadmin": "#6E62E6", "admin": "#C9A24B", "user": "#2FA37A"}.get(_u.get("role"), "#6E62E6")
+        st.markdown(
+            f"""<div style="background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.7));
+            border:1px solid #EAE7E0;border-radius:13px;padding:11px 13px;margin-bottom:8px;">
+              <div style="font-size:.68rem;color:#9C978C;font-weight:600;letter-spacing:.06em;">로그인 계정</div>
+              <div style="display:flex;align-items:center;gap:7px;margin-top:4px;">
+                <span style="width:26px;height:26px;border-radius:50%;background:{_rc};color:#fff;
+                  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">
+                  {(_name or '?')[0].upper()}</span>
+                <div style="line-height:1.15;">
+                  <div style="font-weight:700;font-size:.9rem;color:#1A1814;">{_name}</div>
+                  <div style="font-size:.7rem;color:{_rc};font-weight:600;">{_role_label}</div>
+                </div>
+              </div>
+            </div>""",
+            unsafe_allow_html=True,
+        )
         with st.expander("🔑 내 비밀번호 변경"):
             _cur = st.text_input("현재 비밀번호", type="password", key="_pw_cur")
             _new = st.text_input("새 비밀번호", type="password", key="_pw_new")
@@ -77,9 +94,12 @@ if _u:
                     st.success("변경되었습니다.")
                 else:
                     st.error("현재 비밀번호가 틀렸습니다.")
-        if st.button("로그아웃", use_container_width=True):
+        if st.button("🚪 로그아웃", use_container_width=True):
             logout()
             st.rerun()
+    elif not auth_enabled():
+        st.caption("🔓 로그인 비활성 (게스트 접속)")
+        st.caption("secrets에 `AUTH_ENABLED = true` 로 로그인을 켜세요.")
 
 try:
     pg.run()
