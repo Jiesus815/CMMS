@@ -112,10 +112,22 @@ with tab1:
     else:
         df = df.reset_index(drop=True)
 
+        PAGE_SIZE = 15
+        total_rows = len(df)
+        total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
+        pc1, pc2 = st.columns([3, 1])
+        with pc2:
+            page = st.number_input("페이지", min_value=1, max_value=total_pages,
+                                   value=1, step=1, key="rec_page")
+        start = (int(page) - 1) * PAGE_SIZE
+        df_page = df.iloc[start:start + PAGE_SIZE]
+        with pc1:
+            st.caption(f"총 {total_rows:,}건 중 {start + 1:,}–{min(start + PAGE_SIZE, total_rows):,}건  ·  {int(page)}/{total_pages} 페이지")
+
         _BORDER = {"완료": "#2FA37A", "진행 중": "#C98A18", "팬딩": "#9C978C",
                    "고장": "#D6485B", "취소": "#9C978C"}
         cards = '<div class="rec-scroll">'
-        for i, row in df.iterrows():
+        for i, row in df_page.iterrows():
             seq = i + 1
             status = str(row.get("status") or "")
             color = _BORDER.get(status, "#6E62E6")

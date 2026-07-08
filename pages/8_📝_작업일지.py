@@ -57,10 +57,22 @@ with tab1:
             "category": "구분", "title": "제목", "content": "내용",
         })
 
+        PAGE_SIZE = 15
+        total_rows = len(df)
+        total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
+        pc1, pc2 = st.columns([3, 1])
+        with pc2:
+            page = st.number_input("페이지", min_value=1, max_value=total_pages,
+                                   value=1, step=1, key="wl_page")
+        start = (int(page) - 1) * PAGE_SIZE
+        df_page = df.reset_index(drop=True).iloc[start:start + PAGE_SIZE]
+        with pc1:
+            st.caption(f"총 {total_rows:,}건 중 {start + 1:,}–{min(start + PAGE_SIZE, total_rows):,}건  ·  {int(page)}/{total_pages} 페이지")
+
         _CAT_COLOR = {"점검": "#6E62E6", "수리": "#C98A18", "교체": "#D6485B", "청소": "#2FA37A",
                       "조정": "#9A7CF0", "개선": "#C9A24B", "기타": "#9C978C"}
         cards = '<div class="rec-scroll">'
-        for _, r in df.iterrows():
+        for _, r in df_page.iterrows():
             title = html.escape(str(r.get("title") or "(제목 없음)"))
             author = html.escape(str(r.get("author") or "-"))
             fac = html.escape(str(r.get("factory") or ""))
