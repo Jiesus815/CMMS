@@ -116,14 +116,23 @@ with tab1:
         PAGE_SIZE = 15
         total_rows = len(df)
         total_pages = max(1, (total_rows + PAGE_SIZE - 1) // PAGE_SIZE)
-        pc1, pc2 = st.columns([3, 1])
-        with pc2:
+        pc1, pc2, pc3, pc4 = st.columns([3, 1.2, 1.2, 1])
+        with pc4:
             page = st.number_input("페이지", min_value=1, max_value=total_pages,
                                    value=1, step=1, key="rec_page")
+        with pc2:
+            edit_seq = st.number_input("수정할 순번", min_value=1, max_value=total_rows,
+                                       step=1, key="edit_id")
+        with pc3:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            _open_edit = st.button("✏️ 수정/삭제", use_container_width=True, type="primary")
         start = (int(page) - 1) * PAGE_SIZE
         df_page = df.iloc[start:start + PAGE_SIZE]
         with pc1:
             st.caption(f"총 {total_rows:,}건 중 {start + 1:,}–{min(start + PAGE_SIZE, total_rows):,}건  ·  {int(page)}/{total_pages} 페이지")
+        if _open_edit:
+            _r = df.iloc[int(edit_seq) - 1]
+            maintenance_edit_dialog(_r, int(_r["id"]))
 
         _BORDER = {"완료": "#2FA37A", "진행 중": "#C98A18", "팬딩": "#9C978C",
                    "고장": "#D6485B", "취소": "#9C978C"}
@@ -169,17 +178,6 @@ with tab1:
             file_name=f"보전내역_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
         )
-
-        st.markdown("---")
-        st.markdown("##### ✏️ 수정 / 삭제")
-        esc1, esc2 = st.columns([1, 3])
-        with esc1:
-            edit_seq = st.number_input("순번 선택", min_value=1, max_value=len(df), step=1, key="edit_id")
-        with esc2:
-            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-            if st.button("✏️ 선택 항목 수정 / 삭제 열기", type="primary"):
-                row = df.iloc[int(edit_seq) - 1]
-                maintenance_edit_dialog(row, int(row["id"]))
 
 # ══════════════════════════════
 # 탭2: 신규 등록
