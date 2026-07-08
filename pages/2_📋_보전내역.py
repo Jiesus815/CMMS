@@ -98,7 +98,7 @@ with tab1:
         month=None if f_month == "전체" else f_month,
     )
     if f_assignee.strip() and not df.empty:
-        df = df[df["assignee"].fillna("").str.contains(f_assignee.strip(), case=False)]
+        df = df[df["assignee"].fillna("").str.contains(f_assignee.strip(), case=False, regex=False)]
 
     # KPI 요약
     if not df.empty:
