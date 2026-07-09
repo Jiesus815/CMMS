@@ -786,7 +786,7 @@ def _get_factory_count_q(tenant_id, year=None):
     where = "WHERE " + " AND ".join(conds)
     with db_connection() as conn:
         return pd.read_sql_query(
-            f"SELECT factory as 팭토리, COUNT(*) as 건수 FROM maintenance {where} GROUP BY factory ORDER BY 건수 DESC",
+            f"SELECT factory as 팩토리, COUNT(*) as 건수 FROM maintenance {where} GROUP BY factory ORDER BY 건수 DESC",
             conn, params=params,
         )
 

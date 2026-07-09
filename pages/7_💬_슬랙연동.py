@@ -123,7 +123,7 @@ with tab1:
             {"label": "전체 수집", "value": f"{total:,}건", "color": "blue",  "sub": "누적 보전요청"},
             {"label": "진행 중",  "value": f"{in_prog:,}건", "color": "amber", "sub": "미완료"},
             {"label": "완료",     "value": f"{done:,}건",   "color": "green", "sub": "처리 완료"},
-            {"label": "미매칭",   "value": f"{unmatched:,}건", "color": "red",   "sub": "설비/팭토리 불일치"},
+            {"label": "미매칭",   "value": f"{unmatched:,}건", "color": "red",   "sub": "설비/팩토리 불일치"},
         ])
 
         st.markdown("---")

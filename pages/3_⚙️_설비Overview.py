@@ -191,11 +191,11 @@ with tab3:
     else:
         hc1, hc2 = st.columns([2, 3])
         with hc1:
-            h_fac = st.selectbox("팭토리", ["전체"] + FACTORIES, key="hist_fac")
+            h_fac = st.selectbox("팩토리", ["전체"] + FACTORIES, key="hist_fac")
         df_pick = df_all_h if h_fac == "전체" else df_all_h[df_all_h["factory"] == h_fac]
         with hc2:
             if df_pick.empty:
-                st.info("해당 팭토리 설비가 없습니다.")
+                st.info("해당 팩토리 설비가 없습니다.")
                 pick_code = None
             else:
                 opts = {r.equipment_code: f"{r.equipment_name} ({r.equipment_code})"
